@@ -1,0 +1,51 @@
+# Byte-compiled / optimized / Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.ruff_cache/
+
+# Ambientes Virtuais
+.venv/
+env/
+venv/
+ENV/
+
+# Variáveis de ambiente e segredos
+.env
+.env.*
+!.env.example
+
+# IDEs e Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# MLOps & Tracking Local (MLflow)
+mlruns/
+mlartifacts/
+.mlflow/
+
+# Dados locais, uploads e arquivos pesados
+data/
+uploads/
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.bin
+*.pt
+*.onnx
+*.safetensors
+
+# Logs e relatórios temporários
+*.log
+coverage/
+.coverage
+htmlcov/
