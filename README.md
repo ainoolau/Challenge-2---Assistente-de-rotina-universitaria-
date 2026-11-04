@@ -10,7 +10,7 @@ Assistente inteligente para universitarios em multijornada (faculdade, trabalho,
 
 ---
 
-## Guia de Bolso Git para a Equipa
+## Guia de Bolso Git 
 
 ### 1. Atualizar a maquina antes de comecar
 ```bash
