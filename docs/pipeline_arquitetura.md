@@ -1,5 +1,4 @@
-
-# Arquitetura do pipeline de dados do Vezo
+# Arquitetura do pipeline de dados do Assistente Pessoal Universitário
 
 | Campo | Registro |
 | --- | --- |
@@ -11,7 +10,7 @@
 
 ## 1. Escopo
 
-O Vezo apoia estudantes universitários que conciliam estudo, trabalho e outras responsabilidades. O pacote de definição prevê dois usos distintos dos dados. O **motor de planejamento** calcula disponibilidade e conflitos a partir de compromissos estruturados. O **RAG** recupera passagens de fontes de referência para fundamentar as explicações das alternativas de planejamento. O primeiro depende de campos como prazo, duração, prioridade e horários fixos. O segundo precisa recuperar evidências e identificar suas fontes. *Pacote de definição do projeto, pp. 5–6 e 9*
+O Assistente Pessoal Universitário apoia estudantes universitários que conciliam estudo, trabalho e outras responsabilidades. O pacote de definição prevê dois usos distintos dos dados. O **motor de planejamento** calcula disponibilidade e conflitos a partir de compromissos estruturados. O **RAG** recupera passagens de fontes de referência para fundamentar as explicações das alternativas de planejamento. O primeiro depende de campos como prazo, duração, prioridade e horários fixos. O segundo precisa recuperar evidências e identificar suas fontes. *Pacote de definição do projeto, pp. 5–6 e 9*
 
 A arquitetura abaixo é uma proposta baseada no pacote de definição e na tarefa da F4. O cronograma prevê um RAG textual na semana 2 e áudio na semana 5. O OCR atende à importação opcional de imagens. Compromissos pessoais extraídos de texto, áudio ou imagem alimentam o fluxo privado de agenda após validação e confirmação do estudante. A coleção de evidências é alimentada por fontes selecionadas para o RAG. *Pacote de definição do projeto, RF01–RF04, RF08–RF11, RNF10 e cronograma*
 
@@ -55,9 +54,9 @@ Os valores de 500 e 50 são parâmetros iniciais. A verificação deve medir se 
 | MTEB original · recuperação, nDCG@10 em 15 conjuntos | 41,95 | 43,81 |
 | MTEB original · média em 56 conjuntos | 56,26 | 57,78 |
 
-Os resultados são da Tabela 1 do artigo original do MTEB. A métrica nDCG@10 considera a relevância dos resultados e suas posições entre os dez primeiros. O MPNet supera o MiniLM em 1,86 ponto na recuperação e em 1,52 ponto na média geral, na escala de 0 a 100 da tabela. Para o Vezo, a métrica de recuperação é a comparação externa mais direta. O idioma, o corpus e a métrica de aceite do projeto exigem validação própria. [Muennighoff et al., 2023, seção 3.2 e Tabela 1][mteb]
+Os resultados são da Tabela 1 do artigo original do MTEB. A métrica nDCG@10 considera a relevância dos resultados e suas posições entre os dez primeiros. O MPNet supera o MiniLM em 1,86 ponto na recuperação e em 1,52 ponto na média geral, na escala de 0 a 100 da tabela. Para o Assistente Pessoal Universitário, a métrica de recuperação é a comparação externa mais direta. O idioma, o corpus e a métrica de aceite do projeto exigem validação própria. [Muennighoff et al., 2023, seção 3.2 e Tabela 1][mteb]
 
-**Latência e memória.** A documentação do Sentence Transformers relata que o MiniLM é cerca de cinco vezes mais rápido que o MPNet na comparação publicada. Essa referência sustenta a hipótese de menor latência de codificação, a medir no ambiente do Vezo. Com a mesma quantidade de pontos e precisão, 384 dimensões reduzem pela metade o espaço bruto dos vetores. A memória efetiva também depende dos pesos do modelo, do índice, dos metadados, do tamanho dos lotes e da configuração de armazenamento. A dimensão sozinha tampouco determina o tempo de inferência ou a qualidade da recuperação. [Sentence Transformers, Pretrained Models][st] · [Qdrant, Collections][qdrant]
+**Latência e memória.** A documentação do Sentence Transformers relata que o MiniLM é cerca de cinco vezes mais rápido que o MPNet na comparação publicada. Essa referência sustenta a hipótese de menor latência de codificação, a medir no ambiente do Assistente Pessoal Universitário. Com a mesma quantidade de pontos e precisão, 384 dimensões reduzem pela metade o espaço bruto dos vetores. A memória efetiva também depende dos pesos do modelo, do índice, dos metadados, do tamanho dos lotes e da configuração de armazenamento. A dimensão sozinha tampouco determina o tempo de inferência ou a qualidade da recuperação. [Sentence Transformers, Pretrained Models][st] · [Qdrant, Collections][qdrant]
 
 **Português e migração.** A ficha do MiniLM identifica o modelo como voltado ao inglês. A escolha para o MVP depende do desempenho em consultas em português e em consultas em português sobre fontes em inglês, quando esse cruzamento existir no corpus. Se a recuperação ficar aquém da meta, incluir uma referência multilíngue de 768 dimensões, como `intfloat/multilingual-e5-base`, no mesmo teste local. Trocar o modelo requer gerar novos embeddings para todo o corpus e consultar a coleção com o mesmo modelo usado na sua indexação. [Ficha técnica do MiniLM][minilm] · [Ficha técnica do E5 multilíngue][e5] · [Qdrant, Collections][qdrant]
 
@@ -67,7 +66,7 @@ Os resultados são da Tabela 1 do artigo original do MTEB. A métrica nDCG@10 co
 | --- | --- | --- |
 | Finalidade | Fornecer evidências recuperáveis durante a geração. | Ensinar uma relação entre entradas e alvos e medir a capacidade de generalização. |
 | Unidade de dados | Fonte versionada, dividida em passagens com referência à origem. | Exemplo com entrada e rótulo ou valor-alvo, como uma agenda anotada com os conflitos esperados. |
-| Uso no Vezo | Indexar artigos e diretrizes selecionados e recuperar as passagens relevantes em cada consulta. | Treinar um componente supervisionado, caso venha a existir. Casos anotados também podem servir apenas à avaliação do motor. |
+| Uso no Assistente Pessoal Universitário | Indexar artigos e diretrizes selecionados e recuperar as passagens relevantes em cada consulta. | Treinar um componente supervisionado, caso venha a existir. Casos anotados também podem servir apenas à avaliação do motor. |
 | Atualização | Revisar a fonte e atualizar os trechos afetados no índice. | Atualizar os exemplos e, para incorporar o aprendizado ao modelo, executar novo treinamento ou ajuste. |
 
 No desenho proposto, o RAG fornece ao gerador contexto obtido de um índice externo durante a consulta, com os pesos dos modelos fixos. Um conjunto de perguntas com passagens esperadas pode avaliar o recuperador. Essas anotações pertencem ao protocolo de avaliação, enquanto as passagens de referência continuam disponíveis no índice. O pacote prevê casos sintéticos de agenda e documentos científicos indexados como entregas distintas da semana 2. [Lewis et al., 2020][rag] · *Pacote de definição do projeto, cronograma*
