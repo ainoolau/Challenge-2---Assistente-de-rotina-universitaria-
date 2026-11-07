@@ -1,11 +1,18 @@
+version: "3.8"
+
+networks:
+  routine_network:
+    name: routine_network
+    driver: bridge
+
 services:
   qdrant:
     image: qdrant/qdrant:v1.12.1
     container_name: routine_qdrant
     restart: unless-stopped
     ports:
-      - "6333:6333" # HTTP REST API & Web Dashboard
-      - "6334:6334" # gRPC API
+      - "6333:6333"
+      - "6334:6334"
     volumes:
       - qdrant_storage:/qdrant/storage
     networks:
@@ -50,8 +57,3 @@ volumes:
     name: routine_qdrant_storage
   mlflow_data:
     name: routine_mlflow_data
-
-networks:
-  routine_network:
-    name: routine_network
-    driver: bridge

@@ -1,0 +1,55 @@
+﻿# Python e caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+
+# Ambientes Virtuais
+.venv/
+env/
+venv/
+
+# Variaveis de ambiente
+.env
+.env.*
+!.env.example
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# MLOps & Tracking Local
+mlruns/
+mlartifacts/
+.mlflow/
+
+# Dados locais e uploads (liberando data/samples/)
+data/*
+!data/samples/
+!data/samples/**
+uploads/
+
+# Ignorar midias pesadas fora de samples
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.bin
+*.pt
+*.onnx
+*.safetensors
+!data/samples/*.mp3
+!data/samples/*.wav
+!data/samples/*.ogg
+!data/samples/*.m4a
+!data/samples/*.png
+!data/samples/*.jpg
+!data/samples/*.jpeg
+!data/samples/*.pdf
