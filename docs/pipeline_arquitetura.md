@@ -12,34 +12,44 @@
 
 O Assistente Pessoal Universitário apoia estudantes universitários que conciliam estudo, trabalho e outras responsabilidades. O pacote de definição prevê dois usos distintos dos dados. O **motor de planejamento** calcula disponibilidade e conflitos a partir de compromissos estruturados. O **RAG** recupera passagens de fontes de referência para fundamentar as explicações das alternativas de planejamento. O primeiro depende de campos como prazo, duração, prioridade e horários fixos. O segundo precisa recuperar evidências e identificar suas fontes. *Pacote de definição do projeto, pp. 5–6 e 9*
 
-A arquitetura abaixo é uma proposta baseada no pacote de definição e na tarefa da F4. O cronograma prevê um RAG textual na semana 2 e áudio na semana 5. O OCR atende à importação opcional de imagens. Compromissos pessoais extraídos de texto, áudio ou imagem alimentam o fluxo privado de agenda após validação e confirmação do estudante. A coleção de evidências é alimentada por fontes selecionadas para o RAG. *Pacote de definição do projeto, RF01–RF04, RF08–RF11, RNF10 e cronograma*
+A entrega da TASK-04 documenta a ingestão e a indexação para o RAG. A implementação da TASK-03 já aceita texto, documentos, áudio e imagens. A transcrição usa **Whisper tiny** e a extração de texto de imagens usa **Tesseract OCR**. O extrator de PDF também usa Tesseract nas páginas sem texto digital. Essas ferramentas correspondem à implementação atual e podem mudar conforme a avaliação do pipeline. [Código de extração][extractors] · [Código de ingestão][ingestion]
 
 ## 2. Pipeline de ingestão e indexação
 
 ```mermaid
 flowchart TD
     I["Entrada multimodal"]
-    I --> T["Texto digital"]
+    I --> T["Texto e documentos"]
     I --> A["Áudio"]
-    I --> M["Imagem (opcional)"]
-    T -->|Leitura direta| X["Texto extraído com referência à origem"]
-    A -->|Whisper| X
-    M -->|OCR| X
-    X -->|Compromissos pessoais| P["Validação e confirmação para a agenda"]
-    X -->|Fontes selecionadas para o RAG| C["Fatiamento (500 caracteres, overlap de 50)"]
+    I --> M["Imagens"]
+    T -->|Leitura de texto ou OCR no PDF| X["Texto extraído"]
+    A -->|Whisper tiny| X
+    M -->|Tesseract OCR| X
+    X --> C["Fatiamento (500 caracteres, overlap de 50)"]
     C --> E["Vetorização (all-MiniLM-L6-v2, 384 dimensões)"]
     E --> Q["Indexação no Qdrant (vetor e metadados)"]
 ```
 
-Na ramificação do RAG, cada ponto no Qdrant associa o vetor ao trecho recuperável e à sua procedência. O metadado deve incluir identificador do documento e do trecho, título, versão, origem e data da fonte. Quando disponível, registre também página, seção ou intervalo de tempo. Na consulta, a pergunta é vetorizada com a mesma versão do modelo e comparada aos trechos por similaridade de cosseno. O gerador recebe os trechos recuperados com as referências e sinaliza quando eles são insuficientes para sustentar uma orientação. *Pacote de definição do projeto, RF08, RF09, RNF05 e RNF11* · [Qdrant, Collections][qdrant]
+Cada ponto enviado ao Qdrant contém um identificador, o vetor do trecho e os seis campos de payload abaixo. A ingestão grava os pontos diretamente na coleção `rotina_estudante_multimodal` com `upsert`. [Código de ingestão][ingestion] · [Qdrant, Collections][qdrant]
+
+| Campo | Valor gravado |
+| --- | --- |
+| `text` | Texto do trecho. |
+| `source` | Caminho do arquivo de origem. |
+| `task_type` | Tipo atribuído pela extensão do arquivo. Imagens usam `ocr`, áudios usam `audio` e os demais formatos aceitos usam `texto`. |
+| `user_id` | Identificador usado pela ingestão, configurado como `usuario_teste` na versão atual. |
+| `created_at` | Data e hora da indexação em UTC, no formato ISO 8601. |
+| `chunk_index` | Posição do trecho dentro do arquivo, começando em zero. |
+
+Na etapa de recuperação prevista para o RAG, a pergunta é vetorizada com a mesma versão do modelo usado na ingestão e comparada aos trechos por similaridade de cosseno. Os trechos e suas referências dão contexto ao gerador, que deve sinalizar quando as evidências são insuficientes. *Pacote de definição do projeto, RF08, RF09 e RNF05*
 
 ## 3. Fatiamento de 500 caracteres com 50 de sobreposição
 
-**Decisão.** Usar até **500 caracteres por trecho**, com sobreposição nominal de **50 caracteres** entre trechos consecutivos da mesma unidade textual quando ela precisar ser dividida. Em uma janela fixa, o overlap corresponde a 10% do trecho e o avanço é de 450 caracteres. Ao ajustar os cortes a limites naturais do texto, o avanço efetivo pode variar.
+**Decisão.** Usar até **500 caracteres por trecho**, com sobreposição nominal de **50 caracteres** entre trechos consecutivos da mesma unidade textual quando ela precisar ser dividida. A implementação usa janelas fixas com avanço de 450 caracteres. A sobreposição corresponde a 10% de uma janela completa. [Código de ingestão][ingestion]
 
 **Justificativa.** A unidade de informação de um compromisso acadêmico é o próprio evento, com campos que precisam ser interpretados juntos. Por exemplo, em “Entrega do relatório de Redes até sexta-feira, às 23h59”, separar o horário da atividade prejudica a interpretação do prazo. A granularidade de 500 caracteres favorece trechos curtos e reduz a mistura de compromissos distintos. Na agenda, essa unidade corresponde a um registro estruturado. Nas fontes textuais do RAG, a mesma lógica favorece manter juntas uma orientação e suas condições. A sobreposição recupera parte do contexto junto ao corte, como um complemento de frase ou uma ressalva em uma diretriz. Ela também repete conteúdo, o que pode ocupar posições entre os primeiros resultados.
 
-**Regras propostas.** Preservar entradas de lista, linhas de tabelas ou parágrafos curtos que já sejam unidades completas. Quando uma unidade ultrapassar o limite, priorizar cortes em fim de frase ou entre palavras e aplicar a sobreposição dentro da unidade. Preservar títulos e identificadores como metadados para que o trecho mantenha sua origem. Contar os tokens com o tokenizador do modelo antes da vetorização e subdividir trechos que excedam seu limite. O MiniLM trunca por padrão entradas acima de 256 *wordpieces*, e textos ruidosos de OCR ou com identificadores podem consumir mais tokens por caractere. [Ficha técnica do MiniLM][minilm]
+**Melhorias a avaliar no fatiamento.** Preservar entradas de lista, linhas de tabelas ou parágrafos curtos que já sejam unidades completas. Quando uma unidade ultrapassar o limite, priorizar cortes em fim de frase ou entre palavras e aplicar a sobreposição dentro da unidade. Contar os tokens com o tokenizador do modelo antes da vetorização e subdividir trechos que excedam seu limite. O MiniLM trunca por padrão entradas acima de 256 *wordpieces*, e textos ruidosos de OCR ou com identificadores podem consumir mais tokens por caractere. [Ficha técnica do MiniLM][minilm]
 
 Os valores de 500 e 50 são parâmetros iniciais. A verificação deve medir se o trecho recuperado preserva a informação necessária para responder à consulta e se a sobreposição introduz duplicatas nos cinco primeiros resultados.
 
@@ -75,7 +85,7 @@ No desenho proposto, o RAG fornece ao gerador contexto obtido de um índice exte
 
 1. **Isolar o efeito do fatiamento.** Comparar 500/50 com 500/0 para medir o efeito do overlap e com 750/75 para avaliar uma janela maior com a mesma proporção de sobreposição. Usar o mesmo corpus, consultas e modelo, respeitando o limite de tokens em todas as configurações. Anotar evidências por documento e intervalo de texto, de modo que o gabarito permaneça válido quando os limites dos trechos mudarem.
 2. **Medir recuperação e custo.** Comparar MiniLM e MPNet com os mesmos trechos, consultas, hardware, tamanho de lote e critério de avaliação. Registrar a fração de consultas com pelo menos uma passagem relevante entre as cinco primeiras, chamada **Recall@5** no pacote e equivalente a *Hit@5* nessa definição, com meta de **85% ou mais**. Registrar também nDCG@10, latência p50 e p95 de vetorização e busca, pico de RAM e tamanho do índice. Separar consultas em português sobre fontes em português e em inglês quando houver exemplos de ambos os tipos. *Pacote de definição do projeto, p. 9*
-3. **Verificar o fluxo.** Conferir que texto digital, áudio transcrito e, quando habilitado, imagem processada mantêm sua procedência. Incluir casos em que o corte possa separar a atividade do prazo e casos em que trechos vizinhos disputem as primeiras posições da busca.
+3. **Verificar o fluxo.** Conferir que trechos de texto, áudio transcrito e imagens processadas são indexados no Qdrant com a origem registrada em `source`. Incluir casos em que o corte possa separar a atividade do prazo e casos em que trechos vizinhos disputem as primeiras posições da busca.
 4. **Registrar a revisão de Hazel.** Conferir as justificativas, as fontes, as métricas e a leitura do diagrama. Registrar o parecer e a data na versão efetivamente revisada.
 
 | Revisora | Situação | Data | Evidência da aprovação |
@@ -98,3 +108,5 @@ No desenho proposto, o RAG fornece ao gerador contexto obtido de um índice exte
 [e5]: https://huggingface.co/intfloat/multilingual-e5-base
 [qdrant]: https://qdrant.tech/documentation/manage-data/collections/
 [rag]: https://arxiv.org/abs/2005.11401
+[extractors]: https://github.com/ainoolau/Challenge-2---Assistente-de-rotina-universitaria-/blob/feat/task-03-ingestion/src/data_pipeline/extractors.py
+[ingestion]: https://github.com/ainoolau/Challenge-2---Assistente-de-rotina-universitaria-/blob/feat/task-03-ingestion/src/data_pipeline/ingestion.py
