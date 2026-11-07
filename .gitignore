@@ -1,0 +1,21 @@
+
+# Ambiente virtual Python
+.venv/
+venv/
+
+# Arquivos temporários do Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Banco Qdrant local
+data/qdrant/
+
+# Documentos usados nos testes
+data/samples/
+
+# Informações privadas
+.env
+
+# Arquivos temporários do Windows
+Thumbs.db
