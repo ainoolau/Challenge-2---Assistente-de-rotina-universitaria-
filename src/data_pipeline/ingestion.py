@@ -31,7 +31,7 @@ from .extractors import (
 PASTA_DOCUMENTOS = "data/samples"
 PASTA_QDRANT = "data/qdrant"
 
-# Coleção separada para nossos testes
+# Nome da coleção utilizada pelo pipeline
 NOME_COLECAO = "rotina_estudante_multimodal"
 
 USUARIO = "usuario_teste"
@@ -45,7 +45,12 @@ FORMATOS_ACEITOS = [
 
 # 1 - DIVIDIR O TEXTO EM BLOCOS
 
-def dividir_texto(texto, tamanho=500, sobreposicao=50):
+def dividir_texto(
+    texto: str, 
+    tamanho: int = 500,
+    sobreposicao: int = 50
+) -> list[str]:
+    
     """Divide o texto em blocos de até 500 caracteres."""
 
     if tamanho <= 0:
@@ -78,7 +83,7 @@ def dividir_texto(texto, tamanho=500, sobreposicao=50):
 
 # 2 - IDENTIFICAR O FORMATO E EXTRAIR O TEXTO
 
-def extrair_conteudo(arquivo):
+def extrair_conteudo(arquivo: Path) -> str:
     """Escolhe o extrator conforme o formato do arquivo."""
 
     extensao = arquivo.suffix.lower()
@@ -109,7 +114,10 @@ def extrair_conteudo(arquivo):
 
 # 3 - GERAR OS EMBEDDINGS
 
-def gerar_embeddings(blocos, modelo=None):
+def gerar_embeddings(
+    blocos: list[str],
+    modelo: SentenceTransformer | None = None
+) -> list[list[float]]:
     """Transforma os blocos em vetores de 384 dimensões."""
 
     if not blocos:
@@ -129,7 +137,7 @@ def gerar_embeddings(blocos, modelo=None):
 
 # 4 - IDENTIFICAR O TIPO DO DOCUMENTO
 
-def identificar_tipo(arquivo):
+def identificar_tipo(arquivo: Path) -> str:
     """Identifica se o arquivo é imagem, áudio ou texto."""
 
     extensao = arquivo.suffix.lower()
@@ -146,7 +154,7 @@ def identificar_tipo(arquivo):
 
 # 5 - EXECUTAR O PIPELINE
 
-def executar_pipeline():
+def executar_pipeline() -> None:
     """Processa os arquivos e envia os vetores ao Qdrant."""
 
     # Localizar a pasta dos documentos
