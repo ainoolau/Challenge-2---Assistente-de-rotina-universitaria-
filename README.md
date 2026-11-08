@@ -1,15 +1,4 @@
-﻿# Assistente de Rotina e Gestão de Tempo
-
-Assistente inteligente para universitários em multijornada (faculdade, trabalho, residência/projetos e estudo autônomo).
-
-## Stack Principal
-- Python 3.11
-- FastAPI (Backend e APIs)
-- MLflow (Tracking e MLOps)
-- Pytest & Ruff (Qualidade e Testes)
-﻿# Assistente de Rotina e Gestão de Tempo
-
-## TASK-03 - Pipeline de Ingestão Multimodal
+﻿## TASK-03 - Pipeline de Ingestão Multimodal
 
 ### O que é?
 
@@ -45,7 +34,7 @@ O sistema deverá:
 
 | Tecnologia | Função |
 |---|---|
-| Python versão 3.13 | Linguagem utilizada no desenvolvimento. |
+| Python versão 3.11 | Linguagem utilizada no desenvolvimento. |
 | Tesseract OCR | Reconhece textos presentes em imagens. |
 | Whisper tiny | Transcreve áudios para texto. |
 | PyMuPDF | Extrai textos de PDFs. |
