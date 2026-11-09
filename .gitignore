@@ -53,3 +53,22 @@ uploads/
 !data/samples/*.jpg
 !data/samples/*.jpeg
 !data/samples/*.pdf
+
+# Build artifacts & Egg-info
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# Amostras de dados sensíveis e áudios
+/data/samples/*
+!/data/samples/.gitkeep
+*.wav
+*.mp3
+*.m4a
+*.ogg
+*.pdf
+*.png
+*.jpg
+*.jpeg

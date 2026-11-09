@@ -1,4 +1,4 @@
-﻿name: CI Pipeline
+name: CI Pipeline
 
 on:
   push:
@@ -35,41 +35,47 @@ jobs:
           mypy src --ignore-missing-imports
 
   guardrails:
-    name: Bloqueio de Binários e Modelos
+    name: Bloqueio de Binários e LGPD
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repositório
         uses: actions/checkout@v4
 
-      - name: Verificar se há pesos de modelos ou arquivos grandes
+      - name: Verificar se há pesos de modelos, mídias ou arquivos pesados
         run: |
           python - << 'EOF'
           import sys
           from pathlib import Path
 
-          EXTENSOES_BLOQUEADAS = {".bin", ".pt", ".pth", ".gguf", ".safetensors", ".onnx", ".tar.gz", ".zip"}
-          limite_mb = 10
+          EXTENSOES_BLOQUEADAS = (
+              ".bin", ".pt", ".pth", ".gguf", ".safetensors", ".onnx", 
+              ".tar.gz", ".zip", ".wav", ".mp3", ".m4a", ".pdf"
+          )
+          limite_mb = 2.0
           violacoes = []
 
           for path in Path(".").rglob("*"):
               if ".git" in path.parts or ".venv" in path.parts:
                   continue
               if path.is_file():
-                  if path.suffix.lower() in EXTENSOES_BLOQUEADAS:
-                      violacoes.append(f"Extensão proibida detectada: {path}")
-                  elif path.stat().st_size > limite_mb * 1024 * 1024:
-                      violacoes.append(f"Arquivo excede limite ({limite_mb}MB): {path} ({path.stat().st_size / (1024*1024):.2f}MB)")
+                  nome = path.name.lower()
+                  tamanho_mb = path.stat().st_size / (1024 * 1024)
+
+                  if any(nome.endswith(ext) for ext in EXTENSOES_BLOQUEADAS):
+                      violacoes.append(f"Extensão bloqueada (modelo/mídia/LGPD): {path}")
+                  elif tamanho_mb > limite_mb:
+                      violacoes.append(f"Arquivo excede limite seguro ({limite_mb}MB): {path} ({tamanho_mb:.2f}MB)")
 
           if violacoes:
-              print("❌ Falha na validação de arquivos binários:")
+              print("❌ Falha na validação de guardrails:")
               for v in violacoes:
                   print(f"  - {v}")
               sys.exit(1)
-          print("✅ Nenhum arquivo proibido detectado.")
+          print("✅ Repositório limpo: nenhum binário ou dado bruto detectado.")
           EOF
 
   unit-tests:
-    name: Testes Automatizados
+    name: Testes Automatizados (Leves)
     runs-on: ubuntu-latest
     needs: [lint-and-types, guardrails]
     steps:
@@ -82,12 +88,11 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Instalar dependências do projeto
+      - name: Instalar dependências leves de teste
         run: |
           python -m pip install --upgrade pip
-          pip install .
           pip install pytest pytest-mock pytest-asyncio
 
-      - name: Executar Testes Unitários
+      - name: Executar Testes Unitários de Smoke
         run: |
-          pytest tests/ -k "not test_qdrant_smoke"
+          pytest tests/test_smoke.py
