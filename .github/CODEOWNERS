@@ -1,0 +1,19 @@
+﻿# Governança Geral
+*                   @ainoolau
+
+# Pipeline de Dados e Embeddings
+/src/data_pipeline/ @ainoolau
+/data/              @ainoolau
+
+# Agentes e Inteligência Artificial
+/src/agents/        @ainoolau
+
+# Backend e API
+/src/api/           @ainoolau
+
+# Interface do Usuário (Streamlit)
+/src/ui/            @ainoolau
+
+# Infraestrutura e MLOps
+/infra/             @ainoolau
+/.github/           @ainoolau
