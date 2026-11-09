@@ -1,0 +1,31 @@
+# Dependências para testar a TASK-05 (demo de recuperação) e popular a base
+# com a ingestão da TASK-03. Versões testadas em Windows 11 + Python 3.11.9.
+#
+# Instalação (na raiz do projeto):
+#   py -3.11 -m venv .venv
+#   .venv\Scripts\activate
+#   pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+#
+# Além do Python, a ingestão precisa de programas externos (Tesseract e ffmpeg).
+# Veja a seção "Como testar" em observacoes.md.
+
+# --- Demo de recuperação (TASK-05) ---
+qdrant-client==1.20.0
+sentence-transformers==6.2.0
+transformers==5.22.2
+numpy==2.4.6
+
+# --- Ingestão multimodal (TASK-03), necessária para popular data/qdrant ---
+openai-whisper==20250625
+pytesseract==0.3.13
+pymupdf==2.1
+python-docx==1.2.0
+Pillow==13.0.0
+python-dotenv==1.2.4
+# Fornece um binário do ffmpeg (o Whisper precisa dele para ler áudio).
+imageio-ffmpeg==0.8.1
+
+# --- Testes e lint (os mesmos do CI) ---
+pytest==9.2.0
+ruff==0.17.4
