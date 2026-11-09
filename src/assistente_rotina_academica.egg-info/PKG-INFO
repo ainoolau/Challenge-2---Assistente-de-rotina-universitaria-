@@ -20,50 +20,53 @@ Requires-Dist: pytest>=8.0.0; extra == "dev"
 Requires-Dist: ruff>=0.3.0; extra == "dev"
 Requires-Dist: httpx>=0.27.0; extra == "dev"
 
-﻿# Assistente de Rotina e Gestao de Tempo
+# Assistente de Rotina e Gestão de Tempo
 
-Assistente inteligente para universitarios em multijornada (faculdade, trabalho, projetos e estudo autonomo).
+Assistente inteligente para universitários em multijornada (faculdade, trabalho, projetos e estudo autônomo).
 
 ## Stack Principal
-- Python 3.11
-- FastAPI
-- MLflow
-- Pytest & Ruff
+
+- **Linguagem & Runtime:** Python 3.11
+- **Backend & APIs:** FastAPI
+- **Banco Vetorial & MLOps:** Qdrant (Docker) & MLflow
+- **Processamento Multimodal:** Sentence-Transformers (`all-MiniLM-L6-v2`), Whisper local (`tiny`) e Tesseract OCR (`--psm 6`)
+- **Qualidade & Testes:** Pytest & Ruff
 
 ---
 
-## Guia de Bolso Git 
+## Como Configurar o Ambiente Local (Primeira Vez)
 
-### 1. Atualizar a maquina antes de comecar
-```bash
-git checkout develop
-git pull origin develop
-```
+### 1. Pré-requisitos
 
-### 2. Criar a branch de trabalho
-```bash
-git checkout -b feat/nome-da-tarefa
-```
+- **Python 3.11.x** (Obrigatório: versões >=3.12 apresentam incompatibilidade com dependências de IA).
+  - **Windows:** instale via PowerShell:
+    ```powershell
+    winget install Python.Python.3.11
+    ```
+- **Docker e Docker Compose** (para execução isolada do Qdrant e MLflow).
+- **Tesseract OCR** (para ingestão de fotos e grades de horários):
+  - **Windows:**
+    ```powershell
+    winget install UB-Mannheim.TesseractOCR
+    ```
+  - **Linux (Ubuntu/Debian):**
+    ```bash
+    sudo apt install tesseract-ocr tesseract-ocr-por
+    ```
+  - **macOS:**
+    ```bash
+    brew install tesseract tesseract-lang
+    ```
+- **FFmpeg** (necessário para o processamento de áudio com Whisper):
+  - **Windows:** `winget install Gyan.FFmpeg`
+  - **Linux:** `sudo apt install ffmpeg`
+  - **macOS:** `brew install ffmpeg`
 
-### 3. Validar e gravar as alteracoes
-```bash
-ruff format .
-ruff check .
-pytest -v
-git add .
-git commit -m "feat: descricao curta da alteracao"
-```
+### 2. Instalação e Ambiente Virtual
 
-### 4. Enviar a branch e abrir o PR
-```bash
-git push -u origin feat/nome-da-tarefa
-```
-- Aceder ao GitHub e abrir o Pull Request com destino a branch `develop`.
+1. **Clone o repositório e acesse a branch de trabalho:**
 
-### 5. Como rever o PR de um colega
-```bash
-git fetch origin
-git checkout feat/branch-do-colega
-pytest -v
-```
-- Apos testar, aprovar na interface do GitHub em "Files changed" -> "Review changes" -> "Approve".
+   ```bash
+   git clone [https://github.com/ainoolau/Challenge-2---Assistente-de-rotina-universitaria-.git](https://github.com/ainoolau/Challenge-2---Assistente-de-rotina-universitaria-.git)
+   cd Challenge-2---Assistente-de-rotina-universitaria-
+   git checkout develop

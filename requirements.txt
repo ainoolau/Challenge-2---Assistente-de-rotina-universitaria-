@@ -1,0 +1,9 @@
+pytesseract
+Pillow
+openai-whisper
+sentence-transformers
+qdrant-client
+python-dotenv
+PyMuPDF
+python-docx
+pytest
