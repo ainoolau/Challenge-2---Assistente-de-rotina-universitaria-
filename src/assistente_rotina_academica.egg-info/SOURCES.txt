@@ -9,6 +9,9 @@ src/assistente_rotina_academica.egg-info/dependency_links.txt
 src/assistente_rotina_academica.egg-info/requires.txt
 src/assistente_rotina_academica.egg-info/top_level.txt
 src/data_pipeline/__init__.py
+src/data_pipeline/extractors.py
+src/data_pipeline/ingestion.py
 src/mlops/__init__.py
 src/ui/__init__.py
+tests/test_qdrant_smoke.py
 tests/test_smoke.py

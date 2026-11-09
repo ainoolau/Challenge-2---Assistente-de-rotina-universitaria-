@@ -3,6 +3,7 @@ Script Executável de Demonstração (TASK-05) - Live Demo do RAG Multimodal Mul
 """
 
 import sys
+
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 
@@ -21,9 +22,7 @@ def main():
     if len(sys.argv) > 1:
         query = " ".join(sys.argv[1:])
     else:
-        query = input(
-            "Digite sua dúvida sobre rotina/aulas/editais (Enter para padrão): "
-        )
+        query = input("Digite sua dúvida sobre rotina/aulas/editais (Enter para padrão): ")
 
     if not query.strip():
         query = "Quais são as regras de frequência e bolsa da residência?"

@@ -50,9 +50,7 @@ FORMATOS_ACEITOS = [
 # 1 - DIVIDIR O TEXTO EM BLOCOS
 
 
-def dividir_texto(
-    texto: str, tamanho: int = 500, sobreposicao: int = 50
-) -> list[str]:
+def dividir_texto(texto: str, tamanho: int = 500, sobreposicao: int = 50) -> list[str]:
     """Divide o texto em blocos de até 500 caracteres."""
     if tamanho <= 0:
         raise ValueError("O tamanho deve ser positivo.")
@@ -167,9 +165,7 @@ def executar_pipeline() -> None:
 
         cliente.create_collection(
             collection_name=NOME_COLECAO,
-            vectors_config=models.VectorParams(
-                size=384, distance=models.Distance.COSINE
-            ),
+            vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE),
         )
         print("Coleção multilíngue criada com sucesso!")
 
@@ -208,17 +204,13 @@ def executar_pipeline() -> None:
                             "source": arquivo.as_posix(),
                             "task_type": identificar_tipo(arquivo),
                             "user_id": USUARIO,
-                            "created_at": datetime.now(
-                                timezone.utc
-                            ).isoformat(),
+                            "created_at": datetime.now(timezone.utc).isoformat(),
                             "chunk_index": i,
                         },
                     )
                     pontos.append(ponto)
 
-                cliente.upsert(
-                    collection_name=NOME_COLECAO, points=pontos, wait=True
-                )
+                cliente.upsert(collection_name=NOME_COLECAO, points=pontos, wait=True)
 
                 documentos_processados += 1
                 total_vetores += len(pontos)
