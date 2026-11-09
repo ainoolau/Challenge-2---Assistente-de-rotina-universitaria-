@@ -1,0 +1,91 @@
+# PERFIS E ROTINAS DOS ESTUDANTES UNIVERSITÁRIOS EM MULTIJORNADA (COLETA FORMULÁRIO RAG)
+
+Este documento consolida os perfis estruturados e anonimizados dos 8 estudantes universitários participantes do levantamento de rotina em multijornada (Semestre 2026.2). Todos os participantes assinaram o Termo de Consentimento Livre e Esclarecido (LGPD / Uso Acadêmico).
+
+---
+
+## Perfil Estudante 01 (aluno_01)
+- Curso e Instituição: Ciência de Dados e Inteligência Artificial - Centro Universitário IESB
+- Período/Semestre: 5º ou 6º período (6º período)
+- Jornadas Conciliadas: Trabalho CLT / Tempo integral (40h+), Residência Tecnológica / Acadêmica (segunda, quarta e sexta das 08h às 18h), Iniciação Científica (IC) / Pesquisa / Monitoria, Estudo autônomo por fora (cursos, certificações, concursos) e Cuidados domésticos / familiares.
+- Tempo Livre Diário Estimado (Segunda a Sexta): Entre 1 e 2 horas por dia.
+- Maior Gargalo na Gestão da Rotina: Falta de tempo para revisar conteúdo ou estudar para provas.
+- Dia Mais Cheio da Semana: Segunda-feira (Residência das 08h às 18h + aulas presenciais noturnas das 18h às 22h: Projeto Integrador Aplicado em CD & IA II e Aprendizagem de Máquina para Ciências de Dados).
+- Documentos Associados na Base: grade_aluno_01.pdf, audio_rotina_01.ogg, calendario_academico_01.pdf.
+
+---
+
+## Perfil Estudante 02 (aluno_02)
+- Curso e Instituição: Análise e Desenvolvimento de Sistemas - Unisinos
+- Período/Semestre: 3º ou 4º período
+- Jornadas Conciliadas: Residência Tecnológica / Acadêmica (presencial no Gama segundas, quartas e sextas das 08h às 18h, com deslocamento de 45 km), Freelance / Autônomo (tradução e localização de roteiros), Estudo autônomo por fora e Cuidados domésticos / familiares (e cuidados com pets).
+- Tempo Livre Diário Estimado (Segunda a Sexta): Entre 1 e 2 horas por dia.
+- Maior Gargalo na Gestão da Rotina: Esquecimento de prazos de entregas, provas e editais.
+- Dia Mais Cheio da Semana: Quarta-feira (Residência presencial das 08h às 18h + deslocamento + aulas imersivas de Fundamentos de Redes de Computadores das 18h às 19h e Processos de Teste de Software das 19h30 às 20h45).
+- Documentos Associados na Base: grade_aluno_02.jpeg, audio_rotina_02.mp3, calendario_academico_03.png.
+
+---
+
+## Perfil Estudante 03 (aluno_03)
+- Curso e Instituição: Tecnologia da Informação - Universidade Federal de Mato Grosso do Sul (UFMS)
+- Período/Semestre: 9º período ou superior (93,04% da carga horária cumprida)
+- Jornadas Conciliadas: Trabalho CLT / Tempo integral (40h+, terças e quintas das 08h às 18h), Residência Tecnológica / Acadêmica (segundas, quartas e sextas das 08h às 18h), Estudo autônomo por fora e Cuidados domésticos / familiares.
+- Tempo Livre Diário Estimado (Segunda a Sexta): Menos de 1 hora por dia.
+- Maior Gargalo na Gestão da Rotina: Esquecimento de prazos de entregas, provas e editais.
+- Dia Mais Cheio da Semana: Segunda-feira (aulas da graduação em formato EAD — Comportamento Organizacional, Estudo de Libras e Projetos Integradores de TI I, II e III — concentradas nos finais de semana devido à carga horária de residência, trabalho CLT e academia à noite).
+- Documentos Associados na Base: grade_aluno_03.png, audio_rotina_03.wav.
+
+---
+
+## Perfil Estudante 04 (aluno_04)
+- Curso e Instituição: Engenharia de Software - Universidade de Brasília (UnB / FCTE Gama)
+- Período/Semestre: 7º ou 8º período
+- Jornadas Conciliadas: Trabalho CLT / Tempo integral (40h+, terças e quintas das 08h às 19h), Residência Tecnológica / Acadêmica em IA (segundas, quartas e sextas), Iniciação Científica (IC) / Pesquisa / Monitoria (no intervalo de almoço das 12h às 14h e à noite das 18h às 20h) e Estudo autônomo por fora.
+- Tempo Livre Diário Estimado (Segunda a Sexta): Mais de 4 horas (distribuídas entre intervalos e deslocamentos, acordando às 05h00 e dormindo às 23h30).
+- Maior Gargalo na Gestão da Rotina: Desorganização por ter informações espalhadas (WhatsApp, portal acadêmico, e-mail, PDFs).
+- Dia Mais Cheio da Semana: Quarta-feira (conflito de horário entre Residência em IA das 08h às 18h, aulas da graduação como Fundamentos de Sistemas Embarcados às 10h e às 14h, e Iniciação Científica das 12h às 14h e das 18h às 20h).
+- Documentos Associados na Base: grade_aluno_04.pdf, audio_rotina_04.wav, edital_residencia_01.pdf, edital_residencia_02.pdf, calendario_academico_02.pdf.
+
+---
+
+## Perfil Estudante 05 (aluno_05)
+- Curso e Instituição: Ciências Econômicas - Universidade de Brasília (UnB)
+- Período/Semestre: 5º ou 6º período
+- Jornadas Conciliadas: Iniciação Científica (IC) / Pesquisa / Monitoria (Monitoria em Economia Quantitativa 1 e reuniões de orientação à tarde) e Freelance / Autônomo.
+- Tempo Livre Diário Estimado (Segunda a Sexta): Entre 2 e 4 horas por dia.
+- Maior Gargalo na Gestão da Rotina: Falta de tempo para revisar conteúdo ou estudar para provas (alta carga de leitura obrigatória).
+- Dia Mais Cheio da Semana: Segunda, Terça, Quarta e Quinta-feira (Seg/Qua com Teoria Política Moderna das 16h às 17h50 e Contabilidade Nacional das 19h às 20h40; Ter/Qui com Econometria das 08h às 09h50, Microeconomia 1 das 10h às 11h50 e reuniões de pesquisa/monitoria à tarde).
+- Documentos Associados na Base: grade_aluno_05.jpeg, audio_rotina_05.wav.
+
+---
+
+## Perfil Estudante 06 (aluno_06)
+- Curso e Instituição: Ciências Biológicas - Universidade de Brasília (UnB)
+- Período/Semestre: 7º ou 8º período (7º semestre)
+- Jornadas Conciliadas: Iniciação Científica (IC) / Pesquisa / Monitoria (PIBIC em Botânica, Pesquisa em Micologia e Monitoria em IAV), Projetos de Extensão / Empresa Júnior / Liga Acadêmica, Freelance / Autônomo e Cuidados domésticos / familiares.
+- Tempo Livre Diário Estimado (Segunda a Sexta): Entre 1 e 2 horas por dia.
+- Maior Gargalo na Gestão da Rotina: Conflito de horários entre trabalho/estágio/residência e faculdade.
+- Dia Mais Cheio da Semana: Quinta-feira (aulas e atividades das 10h00 às 22h30: Fisiologia Animal 2 das 10h às 11h50, Tópicos em Botânica 2 das 14h às 17h50 e Zoologia dos Invertebrados das 19h às 22h30).
+- Documentos Associados na Base: grade_aluno_06.jpg, audio_rotina_06.wav, edital_pibic_04.jpg, comunicado_monitoria_05.jpg.
+
+---
+
+## Perfil Estudante 07 (aluno_07)
+- Curso e Instituição: Engenharia Elétrica - Universidade de Brasília (UnB)
+- Período/Semestre: 9º período ou superior (12º semestre)
+- Jornadas Conciliadas: Residência Tecnológica / Acadêmica em IA (segundas e quartas das 08h às 18h, sextas das 08h às 12h) e Freelance / Autônomo.
+- Tempo Livre Diário Estimado (Segunda a Sexta): Entre 1 e 2 horas por dia.
+- Maior Gargalo na Gestão da Rotina: Falta de tempo para revisar conteúdo ou estudar para provas.
+- Dia Mais Cheio da Semana: Terça-feira e Quinta-feira (três disciplinas seguidas na UnB: Circuitos Polifásicos das 10h às 11h50, Teoria da Informação das 14h às 15h50 e Eletromagnetismo 1 das 16h às 17h50).
+- Documentos Associados na Base: grade_aluno_07.pdf, audio_rotina_07.ogg, edital_residencia_03.pdf.
+
+---
+
+## Perfil Estudante 08 (aluno_08)
+- Curso e Instituição: História - Universidade de Brasília (UnB)
+- Período/Semestre: 9º período ou superior
+- Jornadas Conciliadas: Estágio (20h a 30h semanais: segundas e quartas pela manhã, terças e quintas à tarde) e Cuidados domésticos / familiares.
+- Tempo Livre Diário Estimado (Segunda a Sexta): Entre 2 e 4 horas por dia.
+- Maior Gargalo na Gestão da Rotina: Conflito de horários entre trabalho/estágio/residência e faculdade.
+- Dia Mais Cheio da Semana: Quarta-feira (estágio pela manhã e bloco contínuo de 5 horários de Prática de Pesquisa Histórica das 14h00 às 18h55; além de aulas às terças, quintas, sextas e sábados pela manhã).
+- Documentos Associados na Base: grade_aluno_08.jpeg, audio_rotina_08.wav.
