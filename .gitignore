@@ -1,38 +1,51 @@
-﻿# Python e caches
+# Python e caches
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 
 # Ambientes Virtuais
 .venv/
 env/
 venv/
 
-# Variaveis de ambiente
+# Variáveis de ambiente
 .env
 .env.*
 !.env.example
 
-# IDEs
+# IDEs e Sistema Operacional
 .vscode/
 .idea/
 *.swp
 *.swo
+Thumbs.db
+.DS_Store
 
 # MLOps & Tracking Local
 mlruns/
 mlartifacts/
 .mlflow/
 
-# Dados locais e uploads (liberando data/samples/)
+# Banco Qdrant local
+data/qdrant/
+
+# Dados locais e uploads (mantendo data/samples versionado para a entrega)
 data/*
 !data/samples/
 !data/samples/**
 uploads/
 
-# Ignorar midias pesadas fora de samples
+# Ignorar modelos pesados
+models/
+*.bin
+*.pt
+*.onnx
+*.safetensors
+
+# Ignorar mídias pesadas fora de samples
 *.mp3
 *.wav
 *.ogg
@@ -41,10 +54,6 @@ uploads/
 *.jpg
 *.jpeg
 *.pdf
-*.bin
-*.pt
-*.onnx
-*.safetensors
 !data/samples/*.mp3
 !data/samples/*.wav
 !data/samples/*.ogg
