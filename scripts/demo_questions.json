@@ -1,0 +1,17 @@
+[
+  {
+    "pergunta": "Quando é a aula de Econometria?",
+    "fonte_esperada": "Sophia_audio",
+    "trecho_esperado": "econometria"
+  },
+  {
+    "pergunta": "Atividades de orientação exigem dedicação em período integral?",
+    "fonte_esperada": "Geovanna_pdf",
+    "trecho_esperado": "período integral"
+  },
+  {
+    "pergunta": "Quais dias a Mahiaara vai para a academia?",
+    "fonte_esperada": "Mahiaara_audio",
+    "trecho_esperado": "academia"
+  }
+]
