@@ -1,5 +1,4 @@
-"""Script de Avaliação Formal de Retrieval (Evaluation Benchmark Completo).
-"""
+"""Script de Avaliação Formal de Retrieval (Evaluation Benchmark Completo)."""
 
 import json
 import time
@@ -173,14 +172,11 @@ def run_evaluation():
             )
             if top_score < SIMILARITY_THRESHOLD:
                 negative_abstained += 1
-            top1_source = (
-                Path(points[0].payload.get("source", "")).name if points else "Nenhum"
-            )
+            top1_source = Path(points[0].payload.get("source", "")).name if points else "Nenhum"
             print(f"[{idx}] {category}")
             print(f"    Query: '{query}'")
             print(
-                f"    Top Score: {top_score:.3f} | Status: {status} | "
-                f"Latência: {elapsed_ms:.1f}ms"
+                f"    Top Score: {top_score:.3f} | Status: {status} | Latência: {elapsed_ms:.1f}ms"
             )
             print(f"    Top-1 Recuperado: {top1_source}\n")
             continue
@@ -217,10 +213,7 @@ def run_evaluation():
         status = f"HIT (Rank #{found_rank})" if found_rank else "MISS"
         print(f"[{idx}] {category}")
         print(f"    Query: '{query}'")
-        print(
-            f"    Esperado: {expected_src} | Status: {status} | "
-            f"Latência: {elapsed_ms:.1f}ms"
-        )
+        print(f"    Esperado: {expected_src} | Status: {status} | Latência: {elapsed_ms:.1f}ms")
         print(f"    Top-5: {', '.join(retrieved_summary)}")
         match_flag = "SIM" if found_relevant_keyword else "NÃO"
         print(f"    Termo Chave no Chunk Correto (Top-3): {match_flag}\n")
