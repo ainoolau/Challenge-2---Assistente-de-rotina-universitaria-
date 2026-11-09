@@ -1,0 +1,12 @@
+{
+  "total_factual_queries": 11,
+  "hit_rate_at_1": 54.54545454545454,
+  "hit_rate_at_3": 90.9090909090909,
+  "hit_rate_at_5": 100.0,
+  "keyword_match_rate_at_3": 90.9090909090909,
+  "mrr": 0.7197,
+  "negative_cases_tested": 1,
+  "avg_latency_ms": 49.68,
+  "collection": "rotina_estudante_multimodal",
+  "model": "paraphrase-multilingual-MiniLM-L12-v2"
+}
