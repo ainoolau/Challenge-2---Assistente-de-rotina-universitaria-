@@ -61,4 +61,26 @@ models/
 !data/samples/*.png
 !data/samples/*.jpg
 !data/samples/*.jpeg
+
+# Build artifacts & Egg-info
+*.egg-info/
+src/*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# Amostras de dados sensíveis e áudios
+/data/samples/*
+!/data/samples/.gitkeep
 !data/samples/*.pdf
+*.wav
+*.mp3
+*.m4a
+*.ogg
+*.png
+*.jpg
+*.jpeg
+
+# Pesos de modelos locais (TASK-06)
+models/

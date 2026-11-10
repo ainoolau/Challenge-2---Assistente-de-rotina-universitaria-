@@ -53,7 +53,12 @@ def base():
             models.PointStruct(
                 id=i,
                 vector=v,
-                payload={"text": t, "source": s, "task_type": "texto", "chunk_index": 0},
+                payload={
+                    "text": t,
+                    "source": s,
+                    "task_type": "texto",
+                    "chunk_index": 0,
+                },
             )
             for i, ((t, s), v) in enumerate(zip(TRECHOS, vectors, strict=True))
         ],
@@ -65,7 +70,11 @@ def base():
 def test_search_returns_top_k_ordered_with_source_and_exact_text(base):
     client, model = base
     hits = search(
-        client, model, "quantas horas semanais de estágio", top_k=3, collection=COLLECTION
+        client,
+        model,
+        "quantas horas semanais de estágio",
+        top_k=3,
+        collection=COLLECTION,
     )
 
     assert len(hits) == 3
@@ -78,19 +87,25 @@ def test_search_returns_top_k_ordered_with_source_and_exact_text(base):
 def test_search_on_empty_collection_returns_nothing():
     client = qdrant_client.QdrantClient(":memory:")
     client.create_collection(
-        "vazia", vectors_config=models.VectorParams(size=DIM, distance=models.Distance.COSINE)
+        "vazia",
+        vectors_config=models.VectorParams(size=DIM, distance=models.Distance.COSINE),
     )
     assert search(client, FakeEmbedder(), "qualquer coisa", collection="vazia") == []
 
 
 def _hit(source, text):
-    return SearchHit(score=0.5, source=source, text=text, task_type="ocr", chunk_index=0)
+    return SearchHit(
+        score=0.5, source=source, text=text, task_type="ocr", chunk_index=0
+    )
 
 
 def test_expected_rank_ignores_line_breaks_and_case():
     hits = [
         _hit("data/samples/Outro.pdf", "nada relevante"),
-        _hit("data/samples/Geovanna_pdf.jpg", "exigem dedicação em período\nintegral, de segunda"),
+        _hit(
+            "data/samples/Geovanna_pdf.jpg",
+            "exigem dedicação em período\nintegral, de segunda",
+        ),
     ]
     assert expected_rank(hits, "geovanna_pdf", "Período Integral") == 2
 

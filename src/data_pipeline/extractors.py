@@ -88,7 +88,9 @@ def extrair_texto_pdf(caminho_pdf: str) -> str:
 
                 imagem = Image.open(BytesIO(pixmap.tobytes("png")))
 
-                texto = pytesseract.image_to_string(imagem, lang="por", config="--psm 6").strip()
+                texto = pytesseract.image_to_string(
+                    imagem, lang="por", config="--psm 6"
+                ).strip()
 
             if texto:
                 textos.append(texto)

@@ -15,7 +15,9 @@ def qdrant_client():
     try:
         client.get_collections()
     except Exception:  # noqa: BLE001
-        pytest.skip("Serviço Qdrant não está rodando em localhost:6333 (ambiente CI/sem Docker).")
+        pytest.skip(
+            "Serviço Qdrant não está rodando em localhost:6333 (ambiente CI/sem Docker)."
+        )
     yield client
     client.close()
 

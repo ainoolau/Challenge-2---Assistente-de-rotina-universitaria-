@@ -6,7 +6,7 @@
 # 4. Transforma os blocos em vetores (Modelo Multilíngue PT-BR)
 # 5. Salva os vetores no Qdrant via Docker (HTTP)
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
@@ -165,7 +165,9 @@ def executar_pipeline() -> None:
 
         cliente.create_collection(
             collection_name=NOME_COLECAO,
-            vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE),
+            vectors_config=models.VectorParams(
+                size=384, distance=models.Distance.COSINE
+            ),
         )
         print("Coleção multilíngue criada com sucesso!")
 
@@ -204,7 +206,7 @@ def executar_pipeline() -> None:
                             "source": arquivo.as_posix(),
                             "task_type": identificar_tipo(arquivo),
                             "user_id": USUARIO,
-                            "created_at": datetime.now(timezone.utc).isoformat(),
+                            "created_at": datetime.now(UTC).isoformat(),
                             "chunk_index": i,
                         },
                     )
