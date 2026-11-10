@@ -45,7 +45,7 @@ def extract_queries_with_groq(
         "Responda estritamente no esquema JSON solicitado."
     )
 
-    prompt = f"Trecho:\n\"\"\"\n{text}\n\"\"\""
+    prompt = f'Trecho:\n"""\n{text}\n"""'
 
     for attempt in range(max_retries):
         try:
@@ -69,7 +69,10 @@ def extract_queries_with_groq(
             wait_time = 2 ** (attempt + 1)
             time.sleep(wait_time)
         except Exception as err:
-            print(f"[WARN] Erro ao chamar LLM com modelo {GROQ_MODEL} (tentativa {attempt + 1}): {err}", file=sys.stderr)
+            print(
+                f"[WARN] Erro ao chamar LLM com modelo {GROQ_MODEL} (tentativa {attempt + 1}): {err}",
+                file=sys.stderr,
+            )
             time.sleep(1)
 
     return None
@@ -113,7 +116,10 @@ def fetch_all_chunks(qdrant: QdrantClient) -> list[dict[str, Any]]:
 def main() -> None:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        print("[ERROR] A variável de ambiente GROQ_API_KEY não foi definida.", file=sys.stderr)
+        print(
+            "[ERROR] A variável de ambiente GROQ_API_KEY não foi definida.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     print(f"Conectando ao Qdrant em {QDRANT_HOST}:{QDRANT_PORT}...")
@@ -121,7 +127,10 @@ def main() -> None:
     qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, check_compatibility=False)
 
     if not qdrant.collection_exists(COLLECTION_NAME):
-        print(f"[ERROR] Coleção '{COLLECTION_NAME}' não encontrada no Qdrant.", file=sys.stderr)
+        print(
+            f"[ERROR] Coleção '{COLLECTION_NAME}' não encontrada no Qdrant.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     groq_client = Groq(api_key=api_key)
@@ -166,12 +175,16 @@ def main() -> None:
         )
 
         if idx % 10 == 0 or idx == len(chunks):
-            print(f"Processados {idx}/{len(chunks)} chunks... ({len(dataset)} pares gerados)")
+            print(
+                f"Processados {idx}/{len(chunks)} chunks... ({len(dataset)} pares gerados)"
+            )
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(dataset, f, ensure_ascii=False, indent=2)
 
-    print(f"\nConcluído com sucesso! {len(dataset)} pares exportados para: {OUTPUT_FILE}")
+    print(
+        f"\nConcluído com sucesso! {len(dataset)} pares exportados para: {OUTPUT_FILE}"
+    )
 
 
 if __name__ == "__main__":

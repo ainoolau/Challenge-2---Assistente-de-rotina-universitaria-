@@ -63,19 +63,26 @@ def mine_hard_negatives() -> None:
                 point_id = str(point.id)
                 candidate_text = point.payload.get("text", "").strip()
 
-                if point_id != str(origin_point_id) and candidate_text != positive_text.strip():
+                if (
+                    point_id != str(origin_point_id)
+                    and candidate_text != positive_text.strip()
+                ):
                     hard_negative_text = candidate_text
                     break
 
             if hard_negative_text:
-                triplets.append({
-                    "anchor": query,
-                    "positive": positive_text,
-                    "negative": hard_negative_text,
-                })
+                triplets.append(
+                    {
+                        "anchor": query,
+                        "positive": positive_text,
+                        "negative": hard_negative_text,
+                    }
+                )
             else:
                 skipped_count += 1
-                print(f"Aviso [{idx}]: Nenhum hard negative encontrado para point_id={origin_point_id}")
+                print(
+                    f"Aviso [{idx}]: Nenhum hard negative encontrado para point_id={origin_point_id}"
+                )
 
     finally:
         client.close()

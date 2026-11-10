@@ -32,7 +32,9 @@ TRAIN_RATIO = 0.85
 SEED = 42
 
 
-def load_dataset(file_path: Path, train_ratio: float, seed: int) -> tuple[Dataset, Dataset]:
+def load_dataset(
+    file_path: Path, train_ratio: float, seed: int
+) -> tuple[Dataset, Dataset]:
     """Carrega os trios JSON e faz o split determinístico treino/validação."""
     if not file_path.exists():
         raise FileNotFoundError(f"Arquivo de trios não encontrado em: {file_path}")
@@ -44,11 +46,13 @@ def load_dataset(file_path: Path, train_ratio: float, seed: int) -> tuple[Datase
     positives = [str(item["positive"]).strip() for item in data]
     negatives = [str(item["negative"]).strip() for item in data]
 
-    raw_dataset = Dataset.from_dict({
-        "anchor": anchors,
-        "positive": positives,
-        "negative": negatives,
-    })
+    raw_dataset = Dataset.from_dict(
+        {
+            "anchor": anchors,
+            "positive": positives,
+            "negative": negatives,
+        }
+    )
 
     split_dataset = raw_dataset.train_test_split(
         test_size=(1.0 - train_ratio),
