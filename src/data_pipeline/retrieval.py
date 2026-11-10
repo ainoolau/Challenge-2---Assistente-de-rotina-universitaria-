@@ -56,8 +56,12 @@ def expected_rank(
     """Posição (1-based) do primeiro trecho cuja fonte contém expected_source e
     cujo texto contém expected_text, ou None se nenhum dos hits atende."""
     for rank, hit in enumerate(hits, start=1):
-        source_ok = expected_source is None or _normalize(expected_source) in _normalize(hit.source)
-        text_ok = expected_text is None or _normalize(expected_text) in _normalize(hit.text)
+        source_ok = expected_source is None or _normalize(
+            expected_source
+        ) in _normalize(hit.source)
+        text_ok = expected_text is None or _normalize(expected_text) in _normalize(
+            hit.text
+        )
         if source_ok and text_ok:
             return rank
     return None
@@ -101,7 +105,9 @@ def search(
     A collection usa distância cosseno, então o score fica em [-1, 1]
     (maior = mais próximo), com ou sem normalização do vetor.
     """
-    vector = model.encode([query], normalize_embeddings=True, show_progress_bar=False)[0]
+    vector = model.encode([query], normalize_embeddings=True, show_progress_bar=False)[
+        0
+    ]
     response = client.query_points(
         collection_name=collection,
         query=[float(x) for x in vector],

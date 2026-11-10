@@ -165,7 +165,9 @@ def executar_pipeline() -> None:
 
         cliente.create_collection(
             collection_name=NOME_COLECAO,
-            vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE),
+            vectors_config=models.VectorParams(
+                size=384, distance=models.Distance.COSINE
+            ),
         )
         print("Coleção multilíngue criada com sucesso!")
 

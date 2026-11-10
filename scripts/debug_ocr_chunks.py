@@ -50,7 +50,9 @@ for q, expected in queries:
     for idx, p in enumerate(points, start=1):
         src = Path(p.payload.get("source", "")).name
         if expected in src:
-            print(f"  -> Rank #{idx} | Score: {p.score:.4f} | Chunk #{p.payload.get('chunk_id')}")
+            print(
+                f"  -> Rank #{idx} | Score: {p.score:.4f} | Chunk #{p.payload.get('chunk_id')}"
+            )
             found = True
             break
     if not found:
