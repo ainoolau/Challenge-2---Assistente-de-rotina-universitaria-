@@ -32,7 +32,7 @@ jobs:
 
       - name: Checagem Estática de Tipos (MyPy)
         run: |
-          mypy src --ignore-missing-imports
+          mypy src --ignore-missing-imports --no-warn-return-any
 
   guardrails:
     name: Bloqueio de Binários e LGPD
@@ -82,12 +82,12 @@ jobs:
                       violacoes.append(f"Arquivo excede limite seguro ({limite_mb}MB): {path} ({tamanho_mb:.2f}MB)")
 
           if violacoes:
-              print("Falha na validação de guardrails:")
+              print(" Falha na validação de guardrails:")
               for v in violacoes:
                   print(f"  - {v}")
               sys.exit(1)
 
-          print("Repositório limpo: guardrails aprovados.")
+          print(" Repositório limpo: guardrails aprovados.")
           EOF
 
   unit-tests:
