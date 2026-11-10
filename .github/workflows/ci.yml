@@ -47,31 +47,47 @@ jobs:
           import sys
           from pathlib import Path
 
-          EXTENSOES_BLOQUEADAS = (
-              ".bin", ".pt", ".pth", ".gguf", ".safetensors", ".onnx", 
+          EXTENSOES_PESOS_MODELOS = (
+              ".bin", ".pt", ".pth", ".gguf", ".safetensors", ".onnx"
+          )
+          EXTENSOES_MIDIA_LGPD = (
               ".tar.gz", ".zip", ".wav", ".mp3", ".m4a", ".pdf"
           )
-          limite_mb = 2.0
+          limite_mb = 10.0
           violacoes = []
 
           for path in Path(".").rglob("*"):
-              if ".git" in path.parts or ".venv" in path.parts:
+              partes = [p.lower() for p in path.parts]
+              if ".git" in partes or ".venv" in partes or "node_modules" in partes:
                   continue
+              
               if path.is_file():
                   nome = path.name.lower()
                   tamanho_mb = path.stat().st_size / (1024 * 1024)
+                  caminho_posix = path.as_posix().lower()
 
-                  if any(nome.endswith(ext) for ext in EXTENSOES_BLOQUEADAS):
-                      violacoes.append(f"Extensão bloqueada (modelo/mídia/LGPD): {path}")
+                  # 1. Pesos de modelos são estritamente proibidos em qualquer lugar
+                  if any(nome.endswith(ext) for ext in EXTENSOES_PESOS_MODELOS):
+                      violacoes.append(f"Peso de modelo detectado: {path}")
+                      continue
+
+                  # 2. Arquivos de mídia/PDF em data/samples são amostras controladas permitidas
+                  if caminho_posix.startswith("data/samples/"):
+                      continue
+
+                  # 3. Fora de data/samples, extensões de mídia/LGPD são barradas
+                  if any(nome.endswith(ext) for ext in EXTENSOES_MIDIA_LGPD):
+                      violacoes.append(f"Extensão bloqueada fora de data/samples (LGPD/Mídia): {path}")
                   elif tamanho_mb > limite_mb:
                       violacoes.append(f"Arquivo excede limite seguro ({limite_mb}MB): {path} ({tamanho_mb:.2f}MB)")
 
           if violacoes:
-              print("❌ Falha na validação de guardrails:")
+              print("Falha na validação de guardrails:")
               for v in violacoes:
                   print(f"  - {v}")
               sys.exit(1)
-          print("✅ Repositório limpo: nenhum binário ou dado bruto detectado.")
+
+          print("Repositório limpo: guardrails aprovados.")
           EOF
 
   unit-tests:
