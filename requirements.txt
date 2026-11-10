@@ -1,7 +1,10 @@
 pytesseract
 Pillow
 openai-whisper
-sentence-transformers
+sentence-transformers>=3.0.0
+torch>=2.2.0
+accelerate>=0.28.0
+datasets>=2.18.0
 qdrant-client
 python-dotenv
 PyMuPDF
