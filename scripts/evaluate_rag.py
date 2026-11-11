@@ -1,5 +1,6 @@
 """Script de Avaliação Formal de Retrieval (Evaluation Benchmark Completo)."""
 
+import argparse
 import json
 import time
 import warnings
@@ -12,8 +13,9 @@ warnings.filterwarnings("ignore", category=UserWarning, module="qdrant_client")
 
 QDRANT_HOST = "localhost"
 QDRANT_PORT = 6333
-COLLECTION_NAME = "rotina_estudante_multimodal"
-MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
+DEFAULT_COLLECTION = "rotina_estudante_multimodal"
+DEFAULT_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
+DEFAULT_OUTPUT = "reports/evaluation_summary.json"
 
 # Limiar de similaridade para considerar uma resposta confiável (Confidence Threshold)
 SIMILARITY_THRESHOLD = 0.50
@@ -111,14 +113,18 @@ EVAL_DATASET = [
 ]
 
 
-def run_evaluation():
+def run_evaluation(
+    collection_name: str = DEFAULT_COLLECTION,
+    model_name: str = DEFAULT_MODEL,
+    output_path: str = DEFAULT_OUTPUT,
+) -> None:
     print("=" * 75)
     print("   BENCHMARK FORMAL DE RETRIEVAL — HOMOLOGAÇÃO & ROBUSTEZ")
-    print(f"   Coleção: {COLLECTION_NAME} | Modelo: {MODEL_NAME}")
+    print(f"   Coleção: {collection_name} | Modelo: {model_name}")
     print("=" * 75)
 
     client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-    model = SentenceTransformer(MODEL_NAME)
+    model = SentenceTransformer(model_name)
 
     latencies = []
     reciprocal_ranks = []
@@ -148,7 +154,7 @@ def run_evaluation():
 
         try:
             response = client.query_points(
-                collection_name=COLLECTION_NAME,
+                collection_name=collection_name,
                 query=query_vector,
                 limit=5,
                 with_payload=True,
@@ -156,7 +162,7 @@ def run_evaluation():
             points = response.points
         except AttributeError:
             points = client.search(
-                collection_name=COLLECTION_NAME,
+                collection_name=collection_name,
                 query_vector=query_vector,
                 limit=5,
                 with_payload=True,
@@ -259,8 +265,9 @@ def run_evaluation():
     print(f"   • Latência Média Geral de Retrieval:          {avg_latency:.1f} ms")
     print("=" * 75)
 
-    Path("reports").mkdir(exist_ok=True)
-    with open("reports/evaluation_summary.json", "w", encoding="utf-8") as f:
+    out_file = Path(output_path)
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_file, "w", encoding="utf-8") as f:
         json.dump(
             {
                 "total_factual_queries": valid_queries_count,
@@ -271,15 +278,39 @@ def run_evaluation():
                 "mrr": round(mrr, 4),
                 "negative_cases_tested": negative_queries_count,
                 "avg_latency_ms": round(avg_latency, 2),
-                "collection": COLLECTION_NAME,
-                "model": MODEL_NAME,
+                "collection": collection_name,
+                "model": model_name,
             },
             f,
             indent=2,
             ensure_ascii=False,
         )
-    print("[✓] Relatório consolidado exportado: reports/evaluation_summary.json\n")
+    print(f"[✓] Relatório consolidado exportado: {out_file}\n")
 
 
 if __name__ == "__main__":
-    run_evaluation()
+    parser = argparse.ArgumentParser(
+        description="Benchmark de Retrieval RAG Multimodal"
+    )
+    parser.add_argument(
+        "--collection",
+        default=DEFAULT_COLLECTION,
+        help="Nome da coleção no Qdrant",
+    )
+    parser.add_argument(
+        "--model-path",
+        default=DEFAULT_MODEL,
+        help="Nome no HuggingFace ou caminho local do modelo",
+    )
+    parser.add_argument(
+        "--output",
+        default=DEFAULT_OUTPUT,
+        help="Caminho do arquivo JSON de saída para métricas",
+    )
+    args = parser.parse_args()
+
+    run_evaluation(
+        collection_name=args.collection,
+        model_name=args.model_path,
+        output_path=args.output,
+    )

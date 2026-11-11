@@ -1,0 +1,12 @@
+{
+  "total_factual_queries": 11,
+  "hit_rate_at_1": 45.45454545454545,
+  "hit_rate_at_3": 72.72727272727273,
+  "hit_rate_at_5": 81.81818181818183,
+  "keyword_match_rate_at_3": 72.72727272727273,
+  "mrr": 0.5939,
+  "negative_cases_tested": 1,
+  "avg_latency_ms": 2066.92,
+  "collection": "rotina_estudante_finetuned",
+  "model": "models/MiniLM-L12-rotina-v2"
+}
