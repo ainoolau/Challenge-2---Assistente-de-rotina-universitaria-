@@ -48,3 +48,7 @@ Assistente inteligente para universitários em multijornada (faculdade, trabalho
    git clone [https://github.com/ainoolau/Challenge-2---Assistente-de-rotina-universitaria-.git](https://github.com/ainoolau/Challenge-2---Assistente-de-rotina-universitaria-.git)
    cd Challenge-2---Assistente-de-rotina-universitaria-
    git checkout develop
+### Benchmark zero-shot (Cenário 1)
+
+O executor independente `scripts/scenarios/zero_shot.py` usa Groq ou Ollama sem recuperação
+documental. Consulte [configuração, contrato oficial e execução](docs/zero_shot.md).

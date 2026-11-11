@@ -1,0 +1,280 @@
+{
+  "contract_version": "1.0.0",
+  "golden_set_version": "1.0.0",
+  "scenario": "zero_shot",
+  "run_id": "zero_shot-4d7655233e1943fa8686f53ee778feb1",
+  "generated_at": "2026-11-11T14:16:13.064823+00:00",
+  "config": {
+    "llm_model": "openai/gpt-oss-20b",
+    "llm_provider": "groq",
+    "reasoning_effort": "low",
+    "tools_enabled": false,
+    "retries": 0,
+    "temperature": 0.0,
+    "max_output_tokens": 1024,
+    "prompt_template_id": "zero_shot-question-only-v1",
+    "qdrant_collection": null,
+    "embedding_model": null,
+    "top_k": null,
+    "guardrail_threshold": null,
+    "seed": 42,
+    "timeout_seconds": 120.0,
+    "golden_set_status": "release_candidate",
+    "golden_set_sha256": "838231f739de934e87d120db2bd009bda8bed0d468151df031a5297b932a40c0",
+    "abstention_detection": "explicit-refusal-heuristic-v1; manual review required"
+  },
+  "results": [
+    {
+      "query_id": "GS-01",
+      "scenario": "zero_shot",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": null,
+      "retrieved_chunks": [],
+      "sources": [],
+      "retrieval_scores": [],
+      "retrieval_latency_ms": null,
+      "generation_latency_ms": 113.534,
+      "total_latency_ms": 113.534,
+      "input_tokens": null,
+      "output_tokens": null,
+      "abstained": null,
+      "status": "error",
+      "error": {
+        "type": "HTTPError",
+        "message": "Falha na inferência groq (HTTP 403)"
+      }
+    },
+    {
+      "query_id": "GS-02",
+      "scenario": "zero_shot",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": null,
+      "retrieved_chunks": [],
+      "sources": [],
+      "retrieval_scores": [],
+      "retrieval_latency_ms": null,
+      "generation_latency_ms": 80.46,
+      "total_latency_ms": 80.46,
+      "input_tokens": null,
+      "output_tokens": null,
+      "abstained": null,
+      "status": "error",
+      "error": {
+        "type": "HTTPError",
+        "message": "Falha na inferência groq (HTTP 403)"
+      }
+    },
+    {
+      "query_id": "GS-03",
+      "scenario": "zero_shot",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": null,
+      "retrieved_chunks": [],
+      "sources": [],
+      "retrieval_scores": [],
+      "retrieval_latency_ms": null,
+      "generation_latency_ms": 81.339,
+      "total_latency_ms": 81.339,
+      "input_tokens": null,
+      "output_tokens": null,
+      "abstained": null,
+      "status": "error",
+      "error": {
+        "type": "HTTPError",
+        "message": "Falha na inferência groq (HTTP 403)"
+      }
+    },
+    {
+      "query_id": "GS-04",
+      "scenario": "zero_shot",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": null,
+      "retrieved_chunks": [],
+      "sources": [],
+      "retrieval_scores": [],
+      "retrieval_latency_ms": null,
+      "generation_latency_ms": 85.323,
+      "total_latency_ms": 85.323,
+      "input_tokens": null,
+      "output_tokens": null,
+      "abstained": null,
+      "status": "error",
+      "error": {
+        "type": "HTTPError",
+        "message": "Falha na inferência groq (HTTP 403)"
+      }
+    },
+    {
+      "query_id": "GS-05",
+      "scenario": "zero_shot",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": null,
+      "retrieved_chunks": [],
+      "sources": [],
+      "retrieval_scores": [],
+      "retrieval_latency_ms": null,
+      "generation_latency_ms": 79.319,
+      "total_latency_ms": 79.319,
+      "input_tokens": null,
+      "output_tokens": null,
+      "abstained": null,
+      "status": "error",
+      "error": {
+        "type": "HTTPError",
+        "message": "Falha na inferência groq (HTTP 403)"
+      }
+    },
+    {
+      "query_id": "GS-06",
+      "scenario": "zero_shot",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": null,
+      "retrieved_chunks": [],
+      "sources": [],
+      "retrieval_scores": [],
+      "retrieval_latency_ms": null,
+      "generation_latency_ms": 168.495,
+      "total_latency_ms": 168.495,
+      "input_tokens": null,
+      "output_tokens": null,
+      "abstained": null,
+      "status": "error",
+      "error": {
+        "type": "HTTPError",
+        "message": "Falha na inferência groq (HTTP 403)"
+      }
+    },
+    {
+      "query_id": "GS-07",
+      "scenario": "zero_shot",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": null,
+      "retrieved_chunks": [],
+      "sources": [],
+      "retrieval_scores": [],
+      "retrieval_latency_ms": null,
+      "generation_latency_ms": 78.128,
+      "total_latency_ms": 78.128,
+      "input_tokens": null,
+      "output_tokens": null,
+      "abstained": null,
+      "status": "error",
+      "error": {
+        "type": "HTTPError",
+        "message": "Falha na inferência groq (HTTP 403)"
+      }
+    },
+    {
+      "query_id": "GS-08",
+      "scenario": "zero_shot",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": null,
+      "retrieved_chunks": [],
+      "sources": [],
+      "retrieval_scores": [],
+      "retrieval_latency_ms": null,
+      "generation_latency_ms": 83.955,
+      "total_latency_ms": 83.955,
+      "input_tokens": null,
+      "output_tokens": null,
+      "abstained": null,
+      "status": "error",
+      "error": {
+        "type": "HTTPError",
+        "message": "Falha na inferência groq (HTTP 403)"
+      }
+    },
+    {
+      "query_id": "GS-09",
+      "scenario": "zero_shot",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": null,
+      "retrieved_chunks": [],
+      "sources": [],
+      "retrieval_scores": [],
+      "retrieval_latency_ms": null,
+      "generation_latency_ms": 89.437,
+      "total_latency_ms": 89.437,
+      "input_tokens": null,
+      "output_tokens": null,
+      "abstained": null,
+      "status": "error",
+      "error": {
+        "type": "HTTPError",
+        "message": "Falha na inferência groq (HTTP 403)"
+      }
+    },
+    {
+      "query_id": "GS-10",
+      "scenario": "zero_shot",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": null,
+      "retrieved_chunks": [],
+      "sources": [],
+      "retrieval_scores": [],
+      "retrieval_latency_ms": null,
+      "generation_latency_ms": 76.483,
+      "total_latency_ms": 76.483,
+      "input_tokens": null,
+      "output_tokens": null,
+      "abstained": null,
+      "status": "error",
+      "error": {
+        "type": "HTTPError",
+        "message": "Falha na inferência groq (HTTP 403)"
+      }
+    },
+    {
+      "query_id": "GS-11",
+      "scenario": "zero_shot",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": null,
+      "retrieved_chunks": [],
+      "sources": [],
+      "retrieval_scores": [],
+      "retrieval_latency_ms": null,
+      "generation_latency_ms": 180.934,
+      "total_latency_ms": 180.934,
+      "input_tokens": null,
+      "output_tokens": null,
+      "abstained": null,
+      "status": "error",
+      "error": {
+        "type": "HTTPError",
+        "message": "Falha na inferência groq (HTTP 403)"
+      }
+    },
+    {
+      "query_id": "GS-12",
+      "scenario": "zero_shot",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": null,
+      "retrieved_chunks": [],
+      "sources": [],
+      "retrieval_scores": [],
+      "retrieval_latency_ms": null,
+      "generation_latency_ms": 98.582,
+      "total_latency_ms": 98.582,
+      "input_tokens": null,
+      "output_tokens": null,
+      "abstained": null,
+      "status": "error",
+      "error": {
+        "type": "HTTPError",
+        "message": "Falha na inferência groq (HTTP 403)"
+      }
+    }
+  ]
+}

@@ -7,3 +7,4 @@ python-dotenv
 PyMuPDF
 python-docx
 pytest
+jsonschema>=4.18.0
