@@ -50,5 +50,5 @@ Assistente inteligente para universitários em multijornada (faculdade, trabalho
    git checkout develop
 ### Benchmark zero-shot (Cenário 1)
 
-O executor independente `scripts/scenarios/zero_shot.py` usa Ollama sem recuperação
+O executor independente `scripts/scenarios/zero_shot.py` usa Groq ou Ollama sem recuperação
 documental. Consulte [configuração, contrato oficial e execução](docs/zero_shot.md).

@@ -157,3 +157,116 @@ def test_invalid_contract_before_inference(tmp_path):
         )
     assert error.value.code == 2
     generate.assert_not_called()
+
+
+class GroqResponse:
+    def __init__(self, data):
+        self.data = data
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+    def read(self):
+        return json.dumps(self.data).encode()
+
+
+def groq_result(finish="stop", content="Não sei.", usage=None):
+    return {
+        "choices": [{"message": {"content": content}, "finish_reason": finish}],
+        "usage": usage,
+    }
+
+
+def test_groq_payload_and_tokens(config, monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-only-secret")
+    config.update(provider="groq", reasoning_effort="low")
+    response = GroqResponse(
+        groq_result(usage={"prompt_tokens": 15, "completion_tokens": 23})
+    )
+    with patch.object(zs.urllib.request, "urlopen", return_value=response) as http:
+        rows = zs.run([("GS-01", "Pergunta?")], config)
+    request = http.call_args.args[0]
+    payload = json.loads(request.data)
+    assert request.full_url == "https://api.groq.com/openai/v1/chat/completions"
+    assert request.get_header("User-agent") == "vezo-benchmark/1.0"
+    assert payload["messages"] == [{"role": "user", "content": "Pergunta?"}]
+    assert "tools" not in payload and "documents" not in payload
+    assert payload["tool_choice"] == "none"
+    assert payload["include_reasoning"] is False
+    assert payload["reasoning_effort"] == "low"
+    assert payload["max_completion_tokens"] == 32
+    assert rows[0]["provider"] == "groq"
+    assert rows[0]["input_tokens"] == 15
+    assert rows[0]["output_tokens"] == 23
+    assert rows[0]["abstained"] is True
+    assert "test-only-secret" not in json.dumps(rows)
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        groq_result(finish="length"),
+        groq_result(content=""),
+        {"choices": []},
+        groq_result(usage={"prompt_tokens": -1}),
+        groq_result(finish="tool_calls"),
+    ],
+)
+def test_groq_invalid_response_is_error(config, monkeypatch, result):
+    monkeypatch.setenv("GROQ_API_KEY", "test-only-secret")
+    config.update(provider="groq", reasoning_effort="low")
+    with patch.object(zs.urllib.request, "urlopen", return_value=GroqResponse(result)):
+        row = zs.run([("GS-01", "Pergunta?")], config)[0]
+    assert row["status"] == "error"
+    assert row["answer"] is None
+
+
+def test_groq_http_error_sanitized(config, monkeypatch):
+    import io
+    import urllib.error
+
+    monkeypatch.setenv("GROQ_API_KEY", "test-only-secret")
+    config.update(provider="groq", reasoning_effort="low")
+    error = urllib.error.HTTPError(
+        "https://api.groq.com", 429, "secret-error", {}, io.BytesIO(b"test-only-secret")
+    )
+    with patch.object(zs.urllib.request, "urlopen", side_effect=error):
+        rows = zs.run([("GS-01", "Pergunta?")], config)
+    assert "HTTP 429" in rows[0]["error"]["message"]
+    assert "secret" not in json.dumps(rows)
+
+
+def test_groq_requires_key_before_inference(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    with patch.object(zs, "generate") as generate, pytest.raises(SystemExit) as exc:
+        zs.main(["--provider", "groq"])
+    assert exc.value.code == 2
+    generate.assert_not_called()
+
+
+def test_groq_cli_official_contract(tmp_path, monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-only-secret")
+    output = tmp_path / "groq.json"
+    with patch.object(
+        zs.urllib.request, "urlopen", return_value=GroqResponse(groq_result())
+    ):
+        assert zs.main(["--provider", "groq", "--output", str(output)]) == 0
+    report = json.loads(output.read_text())
+    assert len(report["results"]) == 12
+    assert report["config"]["llm_model"] == "openai/gpt-oss-20b"
+    assert report["config"]["llm_provider"] == "groq"
+    assert report["config"]["reasoning_effort"] == "low"
+    assert "test-only-secret" not in output.read_text()
+
+
+def test_env_file_loads_only_groq_key(tmp_path, monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.delenv("UNRELATED_TEST_KEY", raising=False)
+    path = tmp_path / ".env"
+    path.write_text('GROQ_API_KEY="test-secret"\nUNRELATED_TEST_KEY=ignore\n')
+    zs.load_api_key(path)
+    assert zs.os.environ["GROQ_API_KEY"] == "test-secret"
+    assert "UNRELATED_TEST_KEY" not in zs.os.environ
