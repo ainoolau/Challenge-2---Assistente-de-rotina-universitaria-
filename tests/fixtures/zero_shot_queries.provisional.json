@@ -1,0 +1,50 @@
+[
+  {
+    "query_id": "provisional-01",
+    "question": "Quais são as regras de frequência e bolsa da residência?"
+  },
+  {
+    "query_id": "provisional-02",
+    "question": "Quais são as regras para retirada e devolução de equipamentos?"
+  },
+  {
+    "query_id": "provisional-03",
+    "question": "Quantas advertências levam ao desligamento da residência?"
+  },
+  {
+    "query_id": "provisional-04",
+    "question": "Quando é a aula de Econometria?"
+  },
+  {
+    "query_id": "provisional-05",
+    "question": "Quais dias o aluno vai para a academia e pratica exercícios?"
+  },
+  {
+    "query_id": "provisional-06",
+    "question": "Como o estudante divide a rotina matinal com a residência e tarefas?"
+  },
+  {
+    "query_id": "provisional-07",
+    "question": "Componentes curriculares do tipo atividade exigem dedicação integral?"
+  },
+  {
+    "query_id": "provisional-08",
+    "question": "Como funciona o revezamento dos monitores nas aulas práticas?"
+  },
+  {
+    "query_id": "provisional-09",
+    "question": "Disciplinas classificadas como atividades precisam de dedicação integral mesmo sem horário fixo?"
+  },
+  {
+    "query_id": "provisional-10",
+    "question": "Em quais dias da semana tem treino de musculação ou esportes?"
+  },
+  {
+    "query_id": "provisional-11",
+    "question": "Qual o maior gargalo relatado na gestão da rotina do aluno?"
+  },
+  {
+    "query_id": "provisional-12",
+    "question": "Qual é a nota de corte do vestibular de Medicina da UnB?"
+  }
+]
