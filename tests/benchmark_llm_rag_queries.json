@@ -1,7 +1,7 @@
 {
   "golden_set_id": "vezo-benchmark-llm-rag",
   "version": "1.0.0",
-  "status": "release_candidate",
+  "status": "frozen",
   "created_at": "2026-11-11",
   "task": "TASK-S3-01 (EPIC-S3-01)",
   "description": "Golden Set oficial e único do benchmark comparativo LLM vs RAG do Vezo. 11 perguntas factuais (6 PDF, 3 OCR, 2 Whisper) + 1 pergunta negativa fora de domínio. Os scripts dos cenários devem ler APENAS query_id e question; os demais campos são gabarito e nunca podem ser enviados ao LLM.",
