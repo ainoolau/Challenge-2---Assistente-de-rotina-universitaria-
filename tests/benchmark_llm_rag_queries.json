@@ -1,0 +1,518 @@
+{
+  "golden_set_id": "vezo-benchmark-llm-rag",
+  "version": "1.0.0",
+  "status": "release_candidate",
+  "created_at": "2026-11-11",
+  "task": "TASK-S3-01 (EPIC-S3-01)",
+  "description": "Golden Set oficial e único do benchmark comparativo LLM vs RAG do Vezo. 11 perguntas factuais (6 PDF, 3 OCR, 2 Whisper) + 1 pergunta negativa fora de domínio. Os scripts dos cenários devem ler APENAS query_id e question; os demais campos são gabarito e nunca podem ser enviados ao LLM.",
+  "result_contract": "tests/benchmark_result_schema.json",
+  "knowledge_base": {
+    "catalog": "data/samples/README.md",
+    "qdrant_collection": "rotina_estudante_multimodal",
+    "embedding_model": "paraphrase-multilingual-MiniLM-L12-v2",
+    "top_k": 3,
+    "whisper_model": "tiny",
+    "ocr": "Tesseract por --psm 6"
+  },
+  "abstention_message": "Não encontrei informações suficientes nos documentos disponíveis para responder a essa pergunta com segurança.",
+  "coverage": {
+    "pdf": ["GS-01", "GS-02", "GS-03", "GS-04", "GS-05", "GS-06"],
+    "image_ocr": ["GS-07", "GS-08", "GS-09"],
+    "audio_whisper": ["GS-10", "GS-11"],
+    "out_of_domain": ["GS-12"]
+  },
+  "sprint2_traceability": {
+    "source": "scripts/evaluate_rag.py (EVAL_DATASET, 12 queries)",
+    "reused": {
+      "EVAL_DATASET[0] regras de frequência e bolsa": "dividida em GS-01 (frequência) e GS-02 (bolsa) para ter uma resposta factual atômica por pergunta",
+      "EVAL_DATASET[1] retirada e devolução de equipamentos": "GS-04",
+      "EVAL_DATASET[2] advertências e desligamento": "GS-03",
+      "EVAL_DATASET[3] aula de Econometria": "GS-09 (fonte principal passou a ser grade_aluno_05.jpeg/OCR; perfis_rotina_forms.txt segue aceita)",
+      "EVAL_DATASET[4] academia": "GS-10",
+      "EVAL_DATASET[5] rotina matinal e residência": "GS-11 (reformulada para ter resposta factual verificável)",
+      "EVAL_DATASET[6] componentes do tipo atividade": "GS-07",
+      "EVAL_DATASET[7] revezamento de monitores": "GS-08",
+      "EVAL_DATASET[11] nota de corte de Medicina": "GS-12"
+    },
+    "removed": {
+      "EVAL_DATASET[8] paráfrase de componentes do tipo atividade": "duplicava GS-07",
+      "EVAL_DATASET[9] paráfrase de academia": "duplicava GS-10",
+      "EVAL_DATASET[10] maior gargalo da rotina": "8 alunos relatam gargalos diferentes; não existe resposta factual única para avaliar"
+    },
+    "new": {
+      "GS-05": "trancamento geral de matrícula (calendário UnB, PDF)",
+      "GS-06": "aviso prévio de rescisão da bolsa (termo de concessão, PDF)"
+    },
+    "comparability_note": "O Golden Set difere do conjunto da Sprint 2. Para comparar Hit Rate@3/MRR com a Sprint 2 (90,9% / 0,7197), o Cenário 2 deve ser reexecutado sobre este Golden Set (EPIC §7.3)."
+  },
+
+  "evaluation_criteria": {
+    "unit": "Cada critério é avaliado por pergunta e agregado como taxa sobre as perguntas aplicáveis. Avaliação feita contra expected_answer, key_facts e evidence; nunca contra conhecimento externo.",
+    "factual_accuracy": {
+      "applies_to": ["zero_shot", "naive_rag", "guardrail_rag"],
+      "questions": "factuais (out_of_domain = false)",
+      "labels": {
+        "correct": "Todos os key_facts presentes (paráfrase e formatos equivalentes aceitos, ex.: '08h' = '8 horas') e nenhuma afirmação que contradiga o gabarito.",
+        "partially_correct": "Ao menos um key_fact presente, mas falta algum, ou há imprecisão que não inverte o sentido (ex.: horário certo com dia faltando).",
+        "incorrect": "Nenhum key_fact presente, ou qualquer afirmação contradiz o gabarito (ex.: '2 advertências' em GS-03).",
+        "abstained": "A resposta recusou responder; não conta como correta nem como alucinação, e é tratada em undue_abstention."
+      },
+      "metrics": {
+        "accuracy_rate": "correct / 11",
+        "lenient_accuracy_rate": "(correct + 0,5 × partially_correct) / 11"
+      }
+    },
+    "hallucination": {
+      "applies_to": ["zero_shot", "naive_rag", "guardrail_rag"],
+      "questions": "todas as 12",
+      "rule": "Uma resposta é alucinada se contém ao menos uma afirmação factual (número, data, prazo, regra, nome de documento ou instituição) que contradiz o gabarito OU não é sustentada pela evidência do Golden Set nem pelos chunks recuperados. Em GS-12, qualquer nota de corte, valor ou fonte informada é alucinação.",
+      "metric": "hallucination_rate = respostas alucinadas / respostas não abstidas"
+    },
+    "faithfulness": {
+      "applies_to": ["naive_rag", "guardrail_rag"],
+      "rule": "Separar a resposta em afirmações atômicas; uma afirmação é fiel se pode ser verificada em algum retrieved_chunks[].text daquela execução.",
+      "labels": {
+        "faithful": "100% das afirmações sustentadas pelos chunks.",
+        "partially_faithful": "≥ 50% e < 100% sustentadas.",
+        "unfaithful": "< 50% sustentadas."
+      },
+      "metric": "faithfulness_rate = faithful / respostas não abstidas",
+      "note": "Uma resposta pode ser correta e infiel (o LLM sabia por conta própria) ou fiel e incorreta (chunk errado recuperado). Registrar os dois eixos separadamente."
+    },
+    "citation_correctness": {
+      "applies_to": ["naive_rag", "guardrail_rag"],
+      "rule": "Avaliar o campo sources do resultado. Citação correta: todo arquivo citado está em accepted_sources da pergunta E foi efetivamente recuperado (aparece em retrieved_chunks).",
+      "labels": {
+        "correct": "≥ 1 fonte citada e todas corretas.",
+        "partially_correct": "Ao menos uma correta, mas há fonte extra fora de accepted_sources.",
+        "incorrect": "Nenhuma fonte correta, ou fonte citada que não foi recuperada (citação inventada).",
+        "missing": "Resposta factual sem nenhuma citação."
+      },
+      "metric": "citation_precision = fontes corretas citadas / total de fontes citadas (somente respostas não abstidas)"
+    },
+    "clarity": {
+      "applies_to": ["zero_shot", "naive_rag", "guardrail_rag"],
+      "scale": {
+        "3": "Responde diretamente à pergunta na primeira frase, em português claro, sem jargão desnecessário; inclui o que o estudante precisa para agir (prazo, local, condição).",
+        "2": "Resposta compreensível, mas prolixa, desorganizada ou com a informação principal escondida.",
+        "1": "Confusa, evasiva, em outro idioma ou com excesso de ressalvas que impedem o uso."
+      },
+      "rule": "Avaliar independentemente da correção. Abstenções com a mensagem padronizada recebem 3.",
+      "metric": "média da escala sobre as 12 perguntas"
+    },
+    "correct_abstention": {
+      "applies_to": ["zero_shot", "naive_rag", "guardrail_rag"],
+      "rule": "Pergunta com expected_behavior = 'abstain' (GS-12) E abstained = true, sem afirmar nenhum dado inventado. Recusar e ainda assim chutar um valor conta como alucinação, não como abstenção correta.",
+      "metric": "correct_abstention_rate = abstenções corretas / perguntas com expected_behavior = 'abstain'"
+    },
+    "undue_abstention": {
+      "applies_to": ["zero_shot", "naive_rag", "guardrail_rag"],
+      "rule": "Pergunta com expected_behavior = 'answer' E abstained = true.",
+      "metric": "undue_abstention_rate = abstenções indevidas / 11",
+      "note": "Para zero_shot espera-se abstenção indevida alta, pois o LLM não tem acesso aos documentos; isso é um resultado esperado da baseline, não um defeito."
+    },
+    "retrieval": {
+      "applies_to": ["retrieval_only", "naive_rag", "guardrail_rag"],
+      "hit_at_3": "Algum dos 3 primeiros retrieved_chunks tem source em accepted_sources.",
+      "mrr": "1/rank do primeiro chunk com source em accepted_sources (0 se não houver no Top-K), média sobre as 11 factuais.",
+      "keyword_match_at_3": "O chunk da fonte aceita no Top-3 contém ao menos um expected_keywords (case-insensitive), como na Sprint 2.",
+      "negative_top_score": "Para GS-12, registrar o score do Top-1 para calibrar o limiar do guardrail."
+    },
+    "performance": {
+      "applies_to": ["zero_shot", "retrieval_only", "naive_rag", "guardrail_rag"],
+      "metrics": "média e mediana de total_latency_ms; média de input_tokens + output_tokens (cenários com LLM); para guardrail_rag, número de chamadas ao LLM evitadas."
+    }
+  },
+
+  "queries": [
+    {
+      "query_id": "GS-01",
+      "question": "Qual é a frequência mínima exigida nas atividades presenciais da Residência em IA?",
+      "category": "Residência / Frequência",
+      "source_type": "pdf",
+      "out_of_domain": false,
+      "expected_behavior": "answer",
+      "expected_answer": "O residente precisa participar de, no mínimo, 90% das atividades formativas programadas para ocorrer presencialmente nas instalações do Programa.",
+      "key_facts": ["no mínimo 90%", "atividades formativas presenciais / nas instalações do Programa"],
+      "primary_source": {
+        "doc_id": "DOC-18",
+        "file": "edital_residencia_02.pdf",
+        "location": "p. 5, seção 5.1 (Responsabilidades do Residente), alínea a"
+      },
+      "accepted_sources": ["edital_residencia_02.pdf"],
+      "evidence": [
+        {
+          "file": "edital_residencia_02.pdf",
+          "location": "p. 5, seção 5.1, alínea a",
+          "excerpt": "cumprir as atividades, etapas, entregas e demais compromissos previstos neste Plano de Trabalho, cuja realização pressupõe a participação em, no mínimo, 90% das atividades formativas programadas para ocorrer presencialmente nas instalações do Programa;"
+        }
+      ],
+      "expected_keywords": ["90%", "presencialmente", "atividades formativas"],
+      "behavior_if_no_evidence": "Abster-se com a mensagem padronizada. Não presumir percentuais comuns (75%, 85%) de outras instituições.",
+      "sprint2_origin": "EVAL_DATASET[0] — 'Quais são as regras de frequência e bolsa da residência?' (parte frequência)",
+      "notes": "O documento não usa a palavra 'frequência'; o termo é 'participação'. Isso testa recuperação semântica."
+    },
+    {
+      "query_id": "GS-02",
+      "question": "Qual é o valor da bolsa da Residência e em quantas parcelas ela é paga?",
+      "category": "Residência / Bolsa",
+      "source_type": "pdf",
+      "out_of_domain": false,
+      "expected_behavior": "answer",
+      "expected_answer": "A bolsa é paga em 8 parcelas de R$ 1.500,00, totalizando R$ 12.000,00. São 4 parcelas em cada um dos dois módulos, condicionadas ao cumprimento das atividades e obrigações do Plano de Trabalho e ao residente permanecer ativo e adimplente.",
+      "key_facts": ["8 parcelas", "R$ 1.500,00 por parcela", "total de R$ 12.000,00"],
+      "primary_source": {
+        "doc_id": "DOC-18",
+        "file": "edital_residencia_02.pdf",
+        "location": "p. 4, seção 4 (Bolsa Residência)"
+      },
+      "accepted_sources": ["edital_residencia_02.pdf", "edital_residencia_01.pdf"],
+      "evidence": [
+        {
+          "file": "edital_residencia_02.pdf",
+          "location": "p. 4, seção 4",
+          "excerpt": "O residente, desde que permaneça ativo no Programa e adimplente quanto às obrigações previstas neste Plano de Trabalho, fará jus ao recebimento de 8 (oito) parcelas da Bolsa de Residência, no valor individual de R$ 1.500,00 (mil e quinhentos reais), totalizando R$ 12.000,00 (doze mil reais) ao longo do Programa."
+        },
+        {
+          "file": "edital_residencia_02.pdf",
+          "location": "p. 4, seção 4",
+          "excerpt": "As parcelas serão distribuídas entre os dois módulos da residência, sendo 4 (quatro) parcelas no primeiro módulo e 4 (quatro) parcelas no segundo módulo"
+        },
+        {
+          "file": "edital_residencia_01.pdf",
+          "location": "p. 2, Cláusula Terceira, item 3.1",
+          "excerpt": "O ELDORADO concederá ao BOLSISTA uma Bolsa de Residência em Software no valor total R$ 12.000,00 (Doze mil reais), a ser paga em 8 (oito) parcelas de R$ 1.500,00 (Mil e quinhentos reais) cada"
+        }
+      ],
+      "expected_keywords": ["1.500,00", "8 (oito) parcelas", "12.000,00"],
+      "behavior_if_no_evidence": "Abster-se com a mensagem padronizada. Não estimar valores de bolsas de outros programas (ex.: PIBIC, CNPq).",
+      "sprint2_origin": "EVAL_DATASET[0] — 'Quais são as regras de frequência e bolsa da residência?' (parte bolsa)",
+      "notes": "Dois documentos sustentam a resposta; citar qualquer um deles é correto."
+    },
+    {
+      "query_id": "GS-03",
+      "question": "Quantas advertências levam ao desligamento da Residência?",
+      "category": "Residência / Sanções",
+      "source_type": "pdf",
+      "out_of_domain": false,
+      "expected_behavior": "answer",
+      "expected_answer": "O residente que acumular 3 advertências é desligado do Programa. Esse limite não impede o desligamento antecipado: dependendo da gravidade, consequências ou reincidência da conduta, o residente pode ser desligado antes. Condutas como agressão, assédio, furto ou acesso não autorizado a sistemas levam a desligamento imediato, independentemente do número de advertências.",
+      "key_facts": ["3 advertências", "pode haver desligamento antes do limite em casos graves"],
+      "primary_source": {
+        "doc_id": "DOC-18",
+        "file": "edital_residencia_02.pdf",
+        "location": "p. 6, seção 5.4 (Advertências e Desligamento)"
+      },
+      "accepted_sources": ["edital_residencia_02.pdf"],
+      "evidence": [
+        {
+          "file": "edital_residencia_02.pdf",
+          "location": "p. 6, seção 5.4",
+          "excerpt": "O residente que acumular 3 (três) advertências será desligado do Programa."
+        },
+        {
+          "file": "edital_residencia_02.pdf",
+          "location": "p. 6, seção 5.4",
+          "excerpt": "O limite de 3 (três) advertências não impede o desligamento antecipado. Dependendo da natureza, gravidade, consequências ou reincidência da conduta, o residente poderá ser desligado antes de atingir esse limite."
+        },
+        {
+          "file": "edital_residencia_02.pdf",
+          "location": "p. 7, seção 5.4",
+          "excerpt": "Poderão resultar em desligamento imediato, independentemente do número de advertências: a) agressão, ameaça, assédio ou discriminação; b) furto, apropriação indevida ou dano intencional a equipamentos ou instalações; c) tentativa de acesso não autorizado a sistemas, redes, arquivos ou contas;"
+        }
+      ],
+      "expected_keywords": ["advertências", "desligado", "limite"],
+      "behavior_if_no_evidence": "Abster-se com a mensagem padronizada. Não inventar número de advertências.",
+      "sprint2_origin": "EVAL_DATASET[2] — 'Quantas advertências levam ao desligamento da residência?'",
+      "notes": "Resposta só com '3 advertências' é partially_correct (falta a ressalva do desligamento antecipado)."
+    },
+    {
+      "query_id": "GS-04",
+      "question": "Quais são as regras para retirada e devolução dos equipamentos da Residência?",
+      "category": "Residência / Equipamentos",
+      "source_type": "pdf",
+      "out_of_domain": false,
+      "expected_behavior": "answer",
+      "expected_answer": "O residente deve retirar o equipamento no início das atividades, verificar seu estado no recebimento, comunicar imediatamente qualquer avaria, devolver o equipamento ao final das atividades e devolver todos os acessórios (carregador, cabo de energia e adaptadores). Os equipamentos devem permanecer no laboratório ou espaço designado e não podem ser retirados sem autorização prévia da coordenação.",
+      "key_facts": [
+        "retirar no início e devolver ao final das atividades",
+        "verificar o estado e comunicar avarias imediatamente",
+        "devolver todos os acessórios (carregador, cabo, adaptadores)",
+        "não retirar do laboratório sem autorização prévia da coordenação"
+      ],
+      "primary_source": {
+        "doc_id": "DOC-18",
+        "file": "edital_residencia_02.pdf",
+        "location": "p. 8, seção 5.5.2 (Retirada e devolução); p. 7, seção 5.5.1"
+      },
+      "accepted_sources": ["edital_residencia_02.pdf"],
+      "evidence": [
+        {
+          "file": "edital_residencia_02.pdf",
+          "location": "p. 8, seção 5.5.2",
+          "excerpt": "O residente deverá: a) retirar o equipamento no início das atividades; b) verificar seu estado no momento do recebimento; c) comunicar imediatamente qualquer avaria identificada; d) devolver o equipamento ao final das atividades; e) devolver todos os acessórios recebidos, incluindo carregador, cabo de energia e adaptadores."
+        },
+        {
+          "file": "edital_residencia_02.pdf",
+          "location": "p. 7, seção 5.5.1",
+          "excerpt": "Os equipamentos deverão permanecer no laboratório ou espaço designado para as atividades, não sendo permitida sua retirada sem autorização prévia da coordenação."
+        }
+      ],
+      "expected_keywords": ["retirada", "devolver", "equipamento", "avaria"],
+      "behavior_if_no_evidence": "Abster-se com a mensagem padronizada. Não presumir regras genéricas de empréstimo (caução, termo de responsabilidade, prazos de dias).",
+      "sprint2_origin": "EVAL_DATASET[1] — 'Quais são as regras para retirada e devolução de equipamentos?'",
+      "notes": "Correct exige ao menos 3 dos 4 key_facts, incluindo a proibição de retirada sem autorização; 1 ou 2 = partially_correct."
+    },
+    {
+      "query_id": "GS-05",
+      "question": "Até quando posso fazer o trancamento geral de matrícula na UnB no semestre 2026.2?",
+      "category": "Calendário acadêmico / Prazos",
+      "source_type": "pdf",
+      "out_of_domain": false,
+      "expected_behavior": "answer",
+      "expected_answer": "O trancamento geral de matrícula automático na UnB em 2026.2 pode ser feito até 12/11/2026, pelo SIGAA (Portal do Aluno > Ensino > Trancamento Automático). Ele suspende todas as atividades acadêmicas do semestre. O trancamento parcial (de um ou mais componentes) tinha prazo até 09/10/2026.",
+      "key_facts": ["até 12/11/2026", "pelo SIGAA (Trancamento Automático)"],
+      "primary_source": {
+        "doc_id": "DOC-23",
+        "file": "calendario_academico_02.pdf",
+        "location": "p. 3, linha 'Trancamento geral de matrícula automático'"
+      },
+      "accepted_sources": ["calendario_academico_02.pdf"],
+      "evidence": [
+        {
+          "file": "calendario_academico_02.pdf",
+          "location": "p. 3, tabela de Atividades",
+          "excerpt": "TRANCAMENTO GERAL DE MATRÍCULA AUTOMÁTICO | Estudante | Até 12/11/2026 | Suspensão de todas as atividades acadêmicas pelo período de um semestre letivo. Deverá ser realizado através do SIGAA > Portal do Aluno > Ensino > Trancamento Automático."
+        },
+        {
+          "file": "calendario_academico_02.pdf",
+          "location": "p. 3, tabela de Atividades",
+          "excerpt": "TRANCAMENTO PARCIAL DE MATRÍCULA AUTOMÁTICO | Estudante | Até 09/10/2026 | Suspensão das atividades curriculares de um componente curricular apenas ou de um grupo de componentes."
+        }
+      ],
+      "expected_keywords": ["12/11/2026", "trancamento geral", "Trancamento Automático"],
+      "behavior_if_no_evidence": "Abster-se com a mensagem padronizada. Não inferir prazos a partir de calendários de outros semestres ou do IESB (calendario_academico_01.pdf).",
+      "sprint2_origin": null,
+      "notes": "Distrator: o prazo de trancamento PARCIAL (09/10/2026) está no mesmo chunk. Responder 09/10/2026 como prazo do trancamento geral é incorrect."
+    },
+    {
+      "query_id": "GS-06",
+      "question": "Com quanto tempo de antecedência é preciso avisar para rescindir o Termo de Concessão de Bolsa da Residência?",
+      "category": "Residência / Rescisão",
+      "source_type": "pdf",
+      "out_of_domain": false,
+      "expected_behavior": "answer",
+      "expected_answer": "Qualquer uma das partes pode rescindir (denunciar) o Termo mediante comunicação prévia à outra parte com antecedência mínima de 30 dias. O descumprimento de obrigações leva ao cancelamento automático mediante notificação por escrito.",
+      "key_facts": ["antecedência mínima de 30 dias", "comunicação prévia à outra parte"],
+      "primary_source": {
+        "doc_id": "DOC-17",
+        "file": "edital_residencia_01.pdf",
+        "location": "p. 4, Cláusula Sexta (Da Rescisão), item 6.1"
+      },
+      "accepted_sources": ["edital_residencia_01.pdf"],
+      "evidence": [
+        {
+          "file": "edital_residencia_01.pdf",
+          "location": "p. 4, Cláusula Sexta, item 6.1",
+          "excerpt": "Qualquer uma das Partes poderá denunciar o presente instrumento desde que mediante comunicação prévia à outra parte com antecedência mínima de 30 (trinta) dias."
+        },
+        {
+          "file": "edital_residencia_01.pdf",
+          "location": "p. 4, Cláusula Sexta, item 6.2",
+          "excerpt": "O descumprimento de qualquer das obrigações assumidas importará no cancelamento automático deste instrumento, mediante simples notificação por escrito à parte infratora."
+        }
+      ],
+      "expected_keywords": ["30 (trinta) dias", "comunicação prévia", "denunciar"],
+      "behavior_if_no_evidence": "Abster-se com a mensagem padronizada. Não aplicar regras trabalhistas de aviso prévio (CLT), pois a bolsa não gera vínculo empregatício.",
+      "sprint2_origin": null,
+      "notes": "Distrator: o item 6.2.1 também cita '30 (trinta) dias', mas para atraso de relatórios. Usar esse prazo com outro sentido é incorrect."
+    },
+    {
+      "query_id": "GS-07",
+      "question": "Componentes curriculares do tipo atividade exigem dedicação em período integral?",
+      "category": "Regras acadêmicas / OCR",
+      "source_type": "image_ocr",
+      "out_of_domain": false,
+      "expected_behavior": "answer",
+      "expected_answer": "Sim. Pela sua natureza, os componentes do tipo atividade (como estágio e pesquisa com orientação individual) têm horário livre, mas exigem dedicação do estudante em período integral, de segunda a sábado, podendo ser necessário o deslocamento diário até a universidade, o campo de estágio ou de pesquisa.",
+      "key_facts": ["sim, período integral", "horário livre", "de segunda a sábado", "pode exigir deslocamento todos os dias"],
+      "primary_source": {
+        "doc_id": "DOC-06",
+        "file": "grade_aluno_06.jpg",
+        "location": "nota de rodapé (*) abaixo da tabela de componentes curriculares"
+      },
+      "accepted_sources": ["grade_aluno_06.jpg"],
+      "evidence": [
+        {
+          "file": "grade_aluno_06.jpg",
+          "location": "nota de rodapé (*) da declaração SIGAA/UnB",
+          "excerpt": "* Componentes curriculares do tipo atividade pela sua natureza possuem horário livre, porém, exigem dedicação do estudante em período integral, de segunda a sábado, podendo ser necessário o deslocamento do discente para universidade, campo de estágio ou de pesquisa todos os dias."
+        }
+      ],
+      "expected_keywords": ["dedicação", "período integral", "atividade"],
+      "behavior_if_no_evidence": "Abster-se com a mensagem padronizada. Não deduzir uma regra geral de carga horária de estágio (ex.: 30 h semanais) sem evidência.",
+      "sprint2_origin": "EVAL_DATASET[6] — 'Componentes curriculares do tipo atividade exigem dedicação integral?' (absorve a paráfrase EVAL_DATASET[8])",
+      "notes": "O texto vem de OCR (Tesseract, fonte pequena); o chunk pode ter erros de reconhecimento. Avaliar a correção da resposta contra o excerto acima."
+    },
+    {
+      "query_id": "GS-08",
+      "question": "Como funciona o revezamento dos monitores nas aulas práticas de Introdução à Anatomia Vegetal?",
+      "category": "Monitoria / OCR",
+      "source_type": "image_ocr",
+      "out_of_domain": false,
+      "expected_behavior": "answer",
+      "expected_answer": "Os monitores devem estar presentes nos dias de aulas práticas. Na turma noturna (turma 3), como há muitos monitores, eles podem se revezar para cobrir as aulas práticas, com exceção da monitora bolsista, que não entra no revezamento. O cronograma revisado, com as datas das aulas práticas, foi disponibilizado no SIGAA das turmas.",
+      "key_facts": [
+        "presença obrigatória nos dias de aulas práticas",
+        "revezamento permitido apenas na turma noturna (turma 3)",
+        "a monitora bolsista não participa do revezamento",
+        "cronograma com as datas no SIGAA"
+      ],
+      "primary_source": {
+        "doc_id": "DOC-21",
+        "file": "comunicado_monitoria_05.jpg",
+        "location": "mensagens do coordenador das 11:45 e 11:51 no grupo 'Monitores IAV 2026.2'"
+      },
+      "accepted_sources": ["comunicado_monitoria_05.jpg"],
+      "evidence": [
+        {
+          "file": "comunicado_monitoria_05.jpg",
+          "location": "mensagem das 11:51 (editada)",
+          "excerpt": "Conforme mencionado em e-mail anterior, os monitores devem estar presentes nos dias de aulas práticas. No caso do noturno (turma 3), como temos muitos monitores, vocês podem se revezar para cobrir as aulas práticas, com exceção da [nome tarjado] que é monitora bolsista."
+        },
+        {
+          "file": "comunicado_monitoria_05.jpg",
+          "location": "mensagem das 11:45",
+          "excerpt": "Retomamos as aulas esse semestre, e já disponibilizei no SIGAA das turmas o cronograma revisado, com as datas de aulas práticas."
+        }
+      ],
+      "expected_keywords": ["revezar", "aulas práticas", "monitores"],
+      "behavior_if_no_evidence": "Abster-se com a mensagem padronizada. Não inventar escalas, número de monitores por aula ou regras de outras disciplinas.",
+      "sprint2_origin": "EVAL_DATASET[7] — 'Como funciona o revezamento dos monitores nas aulas práticas?'",
+      "notes": "Correct exige os 3 primeiros key_facts. A resposta NÃO deve citar nomes de pessoas presentes na imagem."
+    },
+    {
+      "query_id": "GS-09",
+      "question": "Quando é a aula de Econometria?",
+      "category": "Grade horária / OCR",
+      "source_type": "image_ocr",
+      "out_of_domain": false,
+      "expected_behavior": "answer",
+      "expected_answer": "A aula de Econometria (ECO0054, turma 02) é às terças e quintas-feiras, das 08h00 às 09h50 (código de horário 35M12), no período de 10/08/2026 a 14/12/2026.",
+      "key_facts": ["terças e quintas-feiras", "das 08h00 às 09h50"],
+      "primary_source": {
+        "doc_id": "DOC-05",
+        "file": "grade_aluno_05.jpeg",
+        "location": "linha ECO0054 da tabela de componentes e Tabela de Horários (Ter/Qui, 08:00–09:50)"
+      },
+      "accepted_sources": ["grade_aluno_05.jpeg", "perfis_rotina_forms.txt", "audio_rotina_05.wav"],
+      "evidence": [
+        {
+          "file": "grade_aluno_05.jpeg",
+          "location": "tabela de componentes curriculares",
+          "excerpt": "ECO0054 ECONOMETRIA | Tipo: DISCIPLINA | Local: PAT AT 132 | Turma 02 | MATRICULADO(A) | 35M12 (10/08/2026 - 14/12/2026)"
+        },
+        {
+          "file": "grade_aluno_05.jpeg",
+          "location": "Tabela de Horários",
+          "excerpt": "08:00 - 08:55 | Ter: ECO0054 | Qui: ECO0054 ; 08:55 - 09:50 | Ter: ECO0054 | Qui: ECO0054"
+        },
+        {
+          "file": "perfis_rotina_forms.txt",
+          "location": "Perfil Estudante 05 (aluno_05), 'Dia Mais Cheio da Semana'",
+          "excerpt": "Ter/Qui com Econometria das 08h às 09h50, Microeconomia 1 das 10h às 11h50 e reuniões de pesquisa/monitoria à tarde"
+        },
+        {
+          "file": "audio_rotina_05.wav",
+          "location": "transcrição Whisper tiny (ruidosa)",
+          "excerpt": "E tem esse quinta, tem essa ferra no primeiro orário dazoito, tem aula de econometria e das dez de micro-1."
+        }
+      ],
+      "expected_keywords": ["ECO0054", "Econometria", "08h às 09h50"],
+      "behavior_if_no_evidence": "Abster-se com a mensagem padronizada. Não presumir horário de oferta típico da disciplina.",
+      "sprint2_origin": "EVAL_DATASET[3] — 'Quando é a aula de Econometria?' (fonte esperada na Sprint 2: perfis_rotina_forms.txt)",
+      "notes": "Responder apenas com o código '35M12' sem interpretá-lo é partially_correct (pouco claro para o estudante). Fonte principal OCR; o TXT e o áudio também são aceitos."
+    },
+    {
+      "query_id": "GS-10",
+      "question": "Em que momento da semana o estudante de TI que faz Residência e trabalho CLT vai para a academia?",
+      "category": "Rotina pessoal / Áudio",
+      "source_type": "audio_whisper",
+      "out_of_domain": false,
+      "expected_behavior": "answer",
+      "expected_answer": "Ele vai para a academia à noite, depois de chegar da Residência (segundas, quartas e sextas, das 08h às 18h) e depois do trabalho CLT (terças e quintas, também das 08h às 18h), ou seja, nas noites de segunda a sexta. Os estudos da faculdade EaD e da Residência ficam concentrados no fim de semana.",
+      "key_facts": ["à noite", "depois da Residência (seg/qua/sex) e depois do trabalho (ter/qui)"],
+      "primary_source": {
+        "doc_id": "DOC-11",
+        "file": "audio_rotina_03.wav",
+        "location": "transcrição Whisper"
+      },
+      "accepted_sources": ["audio_rotina_03.wav", "perfis_rotina_forms.txt"],
+      "evidence": [
+        {
+          "file": "audio_rotina_03.wav",
+          "location": "transcrição Whisper tiny (ruidosa; '8x8' = 'das 8 às 18', 'selete' = 'CLT', 'a deia' = 'EaD')",
+          "excerpt": "segundo a quarta e sexto de manhã, eu tenho uma residência, então, é de 8x8, quando eu chego da residência na segunda e 4x6, eu vou para a academia de noite. Teste aqui em ter o trabalho selete, então, também trabalho de 8x8, quando eu chego o vou para a academia."
+        },
+        {
+          "file": "perfis_rotina_forms.txt",
+          "location": "Perfil Estudante 03 (aluno_03), 'Dia Mais Cheio da Semana'",
+          "excerpt": "concentradas nos finais de semana devido à carga horária de residência, trabalho CLT e academia à noite"
+        }
+      ],
+      "expected_keywords": ["academia", "noite"],
+      "behavior_if_no_evidence": "Abster-se com a mensagem padronizada. Não atribuir a rotina de academia de outro estudante (ex.: audio_rotina_04.wav).",
+      "sprint2_origin": "EVAL_DATASET[4] — 'Quais dias o aluno vai para a academia e pratica exercícios?' (absorve a paráfrase EVAL_DATASET[9])",
+      "notes": "Pergunta reformulada para identificar o estudante, pois o áudio 04 também menciona academia. Fato confirmado no catálogo (DOC-11: 'frequenta a academia à noite')."
+    },
+    {
+      "query_id": "GS-11",
+      "question": "Em quais dias e horários o estudante de Ciência de Dados faz a Residência e em quais dias ele trabalha?",
+      "category": "Rotina pessoal / Áudio",
+      "source_type": "audio_whisper",
+      "out_of_domain": false,
+      "expected_behavior": "answer",
+      "expected_answer": "A rotina dele começa às 06h. Ele faz a Residência às segundas, quartas e sextas, das 08h às 18h, e trabalha às terças e quintas, das 08h às 17h. À noite tem aulas presenciais (segunda, terça e sexta) e usa as noites de quarta e quinta para a Iniciação Científica.",
+      "key_facts": ["Residência: segunda, quarta e sexta, 08h–18h", "trabalho: terça e quinta, 08h–17h"],
+      "primary_source": {
+        "doc_id": "DOC-09",
+        "file": "audio_rotina_01.ogg",
+        "location": "transcrição Whisper"
+      },
+      "accepted_sources": ["audio_rotina_01.ogg", "perfis_rotina_forms.txt"],
+      "evidence": [
+        {
+          "file": "audio_rotina_01.ogg",
+          "location": "transcrição Whisper tiny (ruidosa; 'segunda-squartas e cestras' = 'segunda, quarta e sexta'; 'Tessa' = 'terça'; 'oitoas dezoito' = 'oito às dezoito')",
+          "excerpt": "Oi, meu rotina na semana começa as seis horas da manhã. Na segunda-squartas e cestras tem o residência das oitoas dezoito. Tessa e quinta trabalho das oitoas dezessete."
+        },
+        {
+          "file": "perfis_rotina_forms.txt",
+          "location": "Perfil Estudante 01 (aluno_01), 'Jornadas Conciliadas'",
+          "excerpt": "Residência Tecnológica / Acadêmica (segunda, quarta e sexta das 08h às 18h)"
+        }
+      ],
+      "expected_keywords": ["seis horas", "residência", "trabalho"],
+      "behavior_if_no_evidence": "Abster-se com a mensagem padronizada. Não preencher dias faltantes com a rotina de outro residente.",
+      "sprint2_origin": "EVAL_DATASET[5] — 'Como o estudante divide a rotina matinal com a residência e tarefas?'",
+      "notes": "Pergunta da Sprint 2 era aberta; foi reformulada para ter fatos verificáveis. Fatos confirmados no catálogo (DOC-09)."
+    },
+    {
+      "query_id": "GS-12",
+      "question": "Qual é a nota de corte do vestibular de Medicina da UnB?",
+      "category": "Caso negativo / Fora de domínio",
+      "source_type": "none",
+      "out_of_domain": true,
+      "expected_behavior": "abstain",
+      "expected_answer": "Não encontrei informações suficientes nos documentos disponíveis para responder a essa pergunta com segurança.",
+      "key_facts": [],
+      "primary_source": null,
+      "accepted_sources": [],
+      "evidence": [],
+      "expected_keywords": [],
+      "behavior_if_no_evidence": "Abster-se. A base não contém notas de corte, vestibular ou informações do curso de Medicina. Citar qualquer número, ano ou fonte é alucinação. É aceitável sugerir ao estudante que consulte a fonte oficial da UnB, desde que nenhuma nota seja informada.",
+      "sprint2_origin": "EVAL_DATASET[11] — 'Qual é a nota de corte do vestibular de Medicina da UnB?'",
+      "notes": "Pergunta-armadilha: menciona 'UnB', presente em vários documentos, e pode gerar score de similaridade enganosamente alto."
+    }
+  ]
+}
