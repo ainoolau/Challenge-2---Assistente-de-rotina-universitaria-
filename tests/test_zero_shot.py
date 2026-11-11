@@ -60,8 +60,8 @@ def test_only_question_is_sent(tmp_path, config):
     assert rows[0]["answer"] == "Resposta"
     assert rows[0]["input_tokens"] == 5
     assert rows[0]["retrieved_chunks"] == rows[0]["sources"] == []
-    assert rows[0]["retrieval_latency_ms"] == 0
-    assert rows[0]["abstained"] is None
+    assert rows[0]["retrieval_latency_ms"] is None
+    assert rows[0]["abstained"] is False
     assert not any(
         name.startswith(("qdrant_client", "data_pipeline")) for name in sys.modules
     )
@@ -70,7 +70,7 @@ def test_only_question_is_sent(tmp_path, config):
 def test_failure_continues_and_tokens_can_be_missing(config):
     with patch.object(zs, "generate", side_effect=[TimeoutError(), ("ok", None, None)]):
         rows = zs.run([("q1", "a"), ("q2", "b")], config)
-    assert [r["status"] for r in rows] == ["error", "success"]
+    assert [r["status"] for r in rows] == ["timeout", "success"]
     assert rows[0]["answer"] is None
     assert rows[0]["error"]["type"] == "TimeoutError"
     assert all(r["total_latency_ms"] >= 0 for r in rows)
@@ -95,19 +95,22 @@ def test_cli_exports_all_twelve(tmp_path):
                 "--model",
                 "test",
                 "--golden-set",
-                str(zs.ROOT / "tests/fixtures/zero_shot_queries.provisional.json"),
+                str(zs.ROOT / "tests/benchmark_llm_rag_queries.json"),
                 "--output",
                 str(output),
             ]
         )
-    rows = json.loads(output.read_text())
+    report = json.loads(output.read_text())
+    rows = report["results"]
+    assert report["golden_set_version"] == "1.0.0"
     assert code == 0
     assert len(rows) == 12
     assert len({r["query_id"] for r in rows}) == 12
     assert set(rows[0]) == set(
         "query_id scenario model provider answer retrieved_chunks sources retrieval_scores retrieval_latency_ms generation_latency_ms total_latency_ms input_tokens output_tokens abstained status error".split()
     )
-    assert output.with_suffix(".metadata.json").exists()
+    assert report["config"]["golden_set_sha256"]
+    assert report["config"]["qdrant_collection"] is None
 
 
 def test_cli_failure_exit(tmp_path):
@@ -117,9 +120,40 @@ def test_cli_failure_exit(tmp_path):
                 "--model",
                 "test",
                 "--golden-set",
-                str(zs.ROOT / "tests/fixtures/zero_shot_queries.provisional.json"),
+                str(zs.ROOT / "tests/benchmark_llm_rag_queries.json"),
                 "--output",
                 str(tmp_path / "errors.json"),
             ]
         )
     assert code == 1
+
+
+@pytest.mark.parametrize(
+    "answer, expected",
+    [
+        ("Não sei a resposta.", True),
+        ("Não tenho acesso às informações necessárias.", True),
+        ("Não posso confirmar esse horário.", True),
+        ("A aula começa às 8h.", False),
+    ],
+)
+def test_abstention_heuristic(answer, expected):
+    assert zs.detects_abstention(answer) is expected
+
+
+def test_invalid_contract_before_inference(tmp_path):
+    golden = tmp_path / "invalid.json"
+    golden.write_text('{"queries": []}')
+    with patch.object(zs, "generate") as generate, pytest.raises(SystemExit) as error:
+        zs.main(
+            [
+                "--model",
+                "test",
+                "--golden-set",
+                str(golden),
+                "--output",
+                str(tmp_path / "out.json"),
+            ]
+        )
+    assert error.value.code == 2
+    generate.assert_not_called()

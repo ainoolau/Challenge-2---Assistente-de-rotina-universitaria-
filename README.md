@@ -51,4 +51,4 @@ Assistente inteligente para universitários em multijornada (faculdade, trabalho
 ### Benchmark zero-shot (Cenário 1)
 
 O executor independente `scripts/scenarios/zero_shot.py` usa Ollama sem recuperação
-documental. Consulte [configuração, contrato provisório e execução](docs/zero_shot.md).
+documental. Consulte [configuração, contrato oficial e execução](docs/zero_shot.md).

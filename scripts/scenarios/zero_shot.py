@@ -1,16 +1,20 @@
-"""Baseline zero-shot independente; requer apenas Python 3.11 e Ollama."""
+"""Baseline zero-shot independente; requer Python 3.11, jsonschema e Ollama."""
 
 import argparse
 import hashlib
 import json
 import math
 import os
+import re
 import sys
 import time
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
+
+import jsonschema
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -80,7 +84,7 @@ def run(queries, config):
             retrieved_chunks=[],
             sources=[],
             retrieval_scores=[],
-            retrieval_latency_ms=0.0,
+            retrieval_latency_ms=None,
             generation_latency_ms=0.0,
             total_latency_ms=0.0,
             input_tokens=None,
@@ -94,6 +98,7 @@ def run(queries, config):
             row["answer"], row["input_tokens"], row["output_tokens"] = generate(
                 question, config
             )
+            row["abstained"] = detects_abstention(row["answer"])
         except (
             urllib.error.URLError,
             TimeoutError,
@@ -102,7 +107,12 @@ def run(queries, config):
             KeyError,
             TypeError,
         ) as exc:
-            row["status"] = "error"
+            row["status"] = (
+                "timeout"
+                if isinstance(exc, TimeoutError)
+                or isinstance(getattr(exc, "reason", None), TimeoutError)
+                else "error"
+            )
             # Não registrar corpo HTTP, URLs ou credenciais do servidor.
             row["error"] = {
                 "type": type(exc).__name__,
@@ -112,6 +122,47 @@ def run(queries, config):
         row["total_latency_ms"] = row["generation_latency_ms"]
         results.append(row)
     return results
+
+
+def detects_abstention(answer):
+    """Heurística conservadora, revisável na avaliação; não consulta gabaritos."""
+    return bool(
+        re.search(
+            r"\b(não (?:sei|tenho (?:acesso|informações|conhecimento)|posso (?:confirmar|responder))"
+            r"|não (?:encontrei|disponho de) informações|i (?:do not|don't) know)\b",
+            answer,
+            re.IGNORECASE,
+        )
+    )
+
+
+def build_report(results, golden_set, config, schema):
+    report = {
+        "contract_version": schema["x-contract-version"],
+        "golden_set_version": golden_set["version"],
+        "scenario": "zero_shot",
+        "run_id": "zero_shot-" + uuid4().hex,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "config": {
+            "llm_model": config["model"],
+            "llm_provider": "ollama",
+            "temperature": config["options"]["temperature"],
+            "max_output_tokens": config["options"]["num_predict"],
+            "prompt_template_id": "zero_shot-question-only-v1",
+            "qdrant_collection": None,
+            "embedding_model": None,
+            "top_k": None,
+            "guardrail_threshold": None,
+            "seed": config["options"]["seed"],
+            "timeout_seconds": config["timeout"],
+            "golden_set_status": golden_set["status"],
+            "golden_set_sha256": config["golden_set_sha256"],
+            "abstention_detection": "explicit-refusal-heuristic-v1; manual review required",
+        },
+        "results": results,
+    }
+    jsonschema.validate(report, schema)
+    return report
 
 
 def save_json(path, data):
@@ -130,6 +181,9 @@ def main(argv=None):
     )
     parser.add_argument(
         "--output", type=Path, default=ROOT / "reports/scenarios/zero_shot_results.json"
+    )
+    parser.add_argument(
+        "--schema", type=Path, default=ROOT / "tests/benchmark_result_schema.json"
     )
     parser.add_argument("--provider", choices=["ollama"], default="ollama")
     parser.add_argument("--model", default=os.getenv("ZERO_SHOT_MODEL"))
@@ -154,10 +208,27 @@ def main(argv=None):
             "Temperatura deve ser finita e >= 0; timeout e max-tokens devem ser positivos"
         )
     try:
+        if args.output.resolve() in (args.golden_set.resolve(), args.schema.resolve()):
+            parser.error("A saída não pode substituir o Golden Set ou schema")
+        raw_golden = args.golden_set.read_bytes()
+        golden_set = json.loads(raw_golden)
+        schema = json.loads(args.schema.read_text(encoding="utf-8"))
+        jsonschema.Draft202012Validator.check_schema(schema)
+        jsonschema.validate(
+            golden_set, {"$ref": "#/$defs/golden_set", "$defs": schema["$defs"]}
+        )
         queries = load_queries(args.golden_set)
-    except (OSError, ValueError) as exc:
+        if len(queries) != 12:
+            raise ValueError("O Golden Set oficial deve conter 12 perguntas")
+    except (
+        OSError,
+        ValueError,
+        jsonschema.ValidationError,
+        jsonschema.SchemaError,
+    ) as exc:
         parser.error(str(exc))
     config = dict(
+        golden_set_sha256=hashlib.sha256(raw_golden).hexdigest(),
         model=args.model,
         base_url=args.base_url,
         timeout=args.timeout,
@@ -166,24 +237,9 @@ def main(argv=None):
         ),
     )
     results = run(queries, config)
-    save_json(args.output, results)
-    save_json(
-        args.output.with_suffix(".metadata.json"),
-        {
-            "created_at": datetime.now(UTC).isoformat(),
-            "provider": args.provider,
-            "model": args.model,
-            "options": config["options"],
-            "timeout_seconds": args.timeout,
-            "golden_set_sha256": hashlib.sha256(
-                args.golden_set.read_bytes()
-            ).hexdigest(),
-            "query_count": len(queries),
-            "scenario": "zero_shot",
-            "contract": "preliminary-task-s3-01",
-        },
-    )
-    failures = sum(row["status"] == "error" for row in results)
+    report = build_report(results, golden_set, config, schema)
+    save_json(args.output, report)
+    failures = sum(row["status"] != "success" for row in results)
     print(f"{len(results)} perguntas; {failures} erros; resultados em {args.output}")
     return 1 if failures else 0
 

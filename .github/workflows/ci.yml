@@ -116,3 +116,6 @@ jobs:
       - name: Validar Golden Set e Contrato do Benchmark (TASK-S3-01)
         run: |
           pytest tests/test_benchmark_golden_set.py -v
+
+      - name: Validar executor zero-shot (TASK-S3-02)
+        run: pytest tests/test_zero_shot.py -v
