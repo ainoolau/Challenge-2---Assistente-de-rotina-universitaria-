@@ -24,8 +24,8 @@ if TYPE_CHECKING:
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# Precisam ser iguais aos da ingestão (TASK-03).
-EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
+
+EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 DEFAULT_COLLECTION = os.getenv("QDRANT_COLLECTION", "rotina_estudante_multimodal")
 DEFAULT_LOCAL_PATH = Path(os.getenv("QDRANT_PATH", PROJECT_ROOT / "data" / "qdrant"))
 

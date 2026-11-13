@@ -15,7 +15,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path, PureWindowsPath
 from uuid import uuid4
 
@@ -23,12 +23,13 @@ from uuid import uuid4
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ))
 
-from dotenv import load_dotenv
-from groq import Groq
-from jsonschema import Draft202012Validator, FormatChecker
-from src.data_pipeline.retrieval import get_client, load_embedder, search
+from dotenv import load_dotenv  # noqa: E402
+from groq import Groq  # noqa: E402
+from jsonschema import Draft202012Validator, FormatChecker  # noqa: E402
 
-load_dotenv(RAIZ / ".env") # é igual a load_dotenv()
+from src.data_pipeline.retrieval import get_client, load_embedder, search  # noqa: E402
+
+load_dotenv(RAIZ / ".env")  # é igual a load_dotenv()
 
 # Configurações combinadas pela equipe para cenários com LLM.
 MODELO_LLM = "openai/gpt-oss-20b"
@@ -175,7 +176,10 @@ def executar_pergunta(pergunta: dict, qdrant, embedder, groq: Groq) -> dict:
                 reasoning_effort="low",
                 messages=[
                     {"role": "system", "content": INSTRUCOES_RAG_V1},
-                    {"role": "user", "content": montar_prompt(pergunta["question"], chunks)},
+                    {
+                        "role": "user",
+                        "content": montar_prompt(pergunta["question"], chunks),
+                    },
                 ],
             )
         finally:
@@ -222,7 +226,9 @@ def validar_e_salvar(dados: dict) -> None:
         scores = resultado["retrieval_scores"]
         if len(chunks) != len(scores) or len(chunks) > TOP_K:
             raise ValueError(f"Chunks/scores inválidos em {resultado['query_id']}")
-        if any(chunk["score"] != score for chunk, score in zip(chunks, scores)):
+        if any(
+            chunk["score"] != score for chunk, score in zip(chunks, scores, strict=True)
+        ):
             raise ValueError(f"Scores fora de ordem em {resultado['query_id']}")
         fontes_disponiveis = {chunk["source"] for chunk in chunks}
         if any(fonte not in fontes_disponiveis for fonte in resultado["sources"]):
@@ -268,7 +274,7 @@ def main() -> None:
         "golden_set_version": versao_golden_set,
         "scenario": "naive_rag",
         "run_id": f"naive_rag-{uuid4().hex[:12]}",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "config": {
             "llm_model": MODELO_LLM,
             "llm_provider": PROVEDOR,
