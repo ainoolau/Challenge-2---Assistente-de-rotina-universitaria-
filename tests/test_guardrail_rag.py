@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+
 import jsonschema
 
 
@@ -9,9 +10,9 @@ def test_guardrail_rag_results_conform_to_schema():
 
     assert results_path.exists(), "Arquivo guardrail_rag_results.json não encontrado."
 
-    with open(schema_path, "r", encoding="utf-8") as f:
+    with open(schema_path, encoding="utf-8") as f:
         schema = json.load(f)
-    with open(results_path, "r", encoding="utf-8") as f:
+    with open(results_path, encoding="utf-8") as f:
         data = json.load(f)
 
     # Valida estrutura completa contra o contrato oficial

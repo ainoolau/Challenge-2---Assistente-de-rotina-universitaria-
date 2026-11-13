@@ -2,9 +2,9 @@ import json
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import jsonschema
 from dotenv import load_dotenv
@@ -46,7 +46,7 @@ REGRAS ESTRITAS:
 4. Seja claro, objetivo e direto."""
 
 
-def build_rag_prompt(question: str, chunks: List[Dict[str, Any]]) -> str:
+def build_rag_prompt(question: str, chunks: list[dict[str, Any]]) -> str:
     context_blocks = []
     for c in chunks:
         context_blocks.append(
@@ -56,7 +56,9 @@ def build_rag_prompt(question: str, chunks: List[Dict[str, Any]]) -> str:
     return f"CONTEXTO DOCUMENTAL:\n{context_str}\n\nPERGUNTA DO ESTUDANTE:\n{question}"
 
 
-def extract_cited_sources(answer: str, retrieved_chunks: List[Dict[str, Any]]) -> List[str]:
+def extract_cited_sources(
+    answer: str, retrieved_chunks: list[dict[str, Any]]
+) -> list[str]:
     """Extrai os basenames dos arquivos efetivamente citados na resposta (conforme schema)."""
     available_sources = list(dict.fromkeys(c["source"] for c in retrieved_chunks))
     cited = [src for src in available_sources if src in answer]
@@ -70,7 +72,7 @@ def extract_cited_sources(answer: str, retrieved_chunks: List[Dict[str, Any]]) -
 
 def retrieve_top_k(
     qdrant: QdrantClient, encoder: SentenceTransformer, question: str, top_k: int = 3
-) -> tuple[List[Dict[str, Any]], float]:
+) -> tuple[list[dict[str, Any]], float]:
     t0 = time.perf_counter()
     query_vector = encoder.encode(question).tolist()
 
@@ -85,7 +87,7 @@ def retrieve_top_k(
     retrieval_latency_ms = round((time.perf_counter() - t0) * 1000, 2)
 
     valid_task_types = {"texto", "ocr", "audio"}
-    chunks: List[Dict[str, Any]] = []
+    chunks: list[dict[str, Any]] = []
 
     for rank_idx, hit in enumerate(search_result, start=1):
         payload = hit.payload or {}
@@ -94,17 +96,23 @@ def retrieve_top_k(
         task_type = raw_task_type if raw_task_type in valid_task_types else None
 
         raw_chunk_idx = payload.get("chunk_index")
-        chunk_index = int(raw_chunk_idx) if isinstance(raw_chunk_idx, int) and raw_chunk_idx >= 0 else None
+        chunk_index = (
+            int(raw_chunk_idx)
+            if isinstance(raw_chunk_idx, int) and raw_chunk_idx >= 0
+            else None
+        )
 
-        chunks.append({
-            "rank": rank_idx,
-            "point_id": str(hit.id) if hit.id is not None else None,
-            "source": Path(raw_source).name,
-            "chunk_index": chunk_index,
-            "task_type": task_type,
-            "score": round(float(hit.score), 4),
-            "text": str(payload.get("text", "")),
-        })
+        chunks.append(
+            {
+                "rank": rank_idx,
+                "point_id": str(hit.id) if hit.id is not None else None,
+                "source": Path(raw_source).name,
+                "chunk_index": chunk_index,
+                "task_type": task_type,
+                "score": round(float(hit.score), 4),
+                "text": str(payload.get("text", "")),
+            }
+        )
 
     return chunks, retrieval_latency_ms
 
@@ -113,14 +121,14 @@ def run_guardrail_benchmark(threshold: float = GUARDRAIL_THRESHOLD) -> None:
     print(f"Iniciando Cenário 4: RAG Avançado com Guardrail (Threshold = {threshold})")
 
     # 1. Carregar Golden Set e Schema oficiais
-    with open(GOLDEN_SET_PATH, "r", encoding="utf-8") as f:
+    with open(GOLDEN_SET_PATH, encoding="utf-8") as f:
         golden_data = json.load(f)
 
     golden_set_version = golden_data["version"]
     official_abstention_msg = golden_data["abstention_message"]
     queries = golden_data["queries"]
 
-    with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
+    with open(SCHEMA_PATH, encoding="utf-8") as f:
         result_schema = json.load(f)
 
     # 2. Inicializar clientes
@@ -131,7 +139,7 @@ def run_guardrail_benchmark(threshold: float = GUARDRAIL_THRESHOLD) -> None:
         raise RuntimeError("GROQ_API_KEY não encontrada no ambiente/.env")
     groq_client = Groq(api_key=groq_api_key)
 
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
 
     for item in queries:
         query_id = item["query_id"]
@@ -142,7 +150,9 @@ def run_guardrail_benchmark(threshold: float = GUARDRAIL_THRESHOLD) -> None:
 
         try:
             # Passo A: Retrieval Top-3 no Qdrant
-            chunks, retrieval_latency_ms = retrieve_top_k(qdrant, encoder, question, TOP_K)
+            chunks, retrieval_latency_ms = retrieve_top_k(
+                qdrant, encoder, question, TOP_K
+            )
             scores = [c["score"] for c in chunks]
             top_score = scores[0] if scores else None
 
@@ -157,11 +167,11 @@ def run_guardrail_benchmark(threshold: float = GUARDRAIL_THRESHOLD) -> None:
                     else f"top_score ({top_score:.4f}) abaixo do limiar ({threshold:.2f})."
                 )
                 answer = official_abstention_msg
-                sources: List[str] = []
+                sources: list[str] = []
                 generation_latency_ms = None
                 input_tokens = 0
                 output_tokens = 0
-                extra_info: Dict[str, Any] = {"guardrail_action": "pre_llm_abort"}
+                extra_info: dict[str, Any] = {"guardrail_action": "pre_llm_abort"}
 
                 print(f"   -> BLOCKED | top_score={top_score} | LLM não chamado.")
             else:
@@ -182,7 +192,9 @@ def run_guardrail_benchmark(threshold: float = GUARDRAIL_THRESHOLD) -> None:
                     temperature=TEMPERATURE,
                     max_tokens=MAX_OUTPUT_TOKENS,
                 )
-                generation_latency_ms = round((time.perf_counter() - t_gen_start) * 1000, 2)
+                generation_latency_ms = round(
+                    (time.perf_counter() - t_gen_start) * 1000, 2
+                )
 
                 answer = (completion.choices[0].message.content or "").strip()
                 usage = completion.usage
@@ -227,7 +239,11 @@ def run_guardrail_benchmark(threshold: float = GUARDRAIL_THRESHOLD) -> None:
 
         except Exception as exc:
             total_latency_ms = round((time.perf_counter() - t_total_start) * 1000, 2)
-            has_valid_score = "top_score" in locals() and top_score is not None and top_score >= threshold
+            has_valid_score = (
+                "top_score" in locals()
+                and top_score is not None
+                and top_score >= threshold
+            )
             entry = {
                 "query_id": query_id,
                 "scenario": SCENARIO_ID,
@@ -237,7 +253,9 @@ def run_guardrail_benchmark(threshold: float = GUARDRAIL_THRESHOLD) -> None:
                 "retrieved_chunks": chunks if "chunks" in locals() else [],
                 "sources": [],
                 "retrieval_scores": scores if "scores" in locals() else [],
-                "retrieval_latency_ms": retrieval_latency_ms if "retrieval_latency_ms" in locals() else None,
+                "retrieval_latency_ms": retrieval_latency_ms
+                if "retrieval_latency_ms" in locals()
+                else None,
                 "generation_latency_ms": None,
                 "total_latency_ms": total_latency_ms,
                 "input_tokens": 0,
@@ -262,7 +280,7 @@ def run_guardrail_benchmark(threshold: float = GUARDRAIL_THRESHOLD) -> None:
         results.append(entry)
 
     # 3. Montagem do Envelope Oficial
-    now_local = datetime.now(timezone.utc).astimezone()
+    now_local = datetime.now(UTC).astimezone()
     output_payload = {
         "contract_version": "1.0.0",
         "golden_set_version": golden_set_version,
