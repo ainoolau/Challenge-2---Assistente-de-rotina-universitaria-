@@ -28,10 +28,10 @@ from groq import Groq
 from jsonschema import Draft202012Validator, FormatChecker
 from src.data_pipeline.retrieval import get_client, load_embedder, search
 
-load_dotenv(RAIZ / ".env")
+load_dotenv(RAIZ / ".env") # é igual a load_dotenv()
 
 # Configurações combinadas pela equipe para cenários com LLM.
-MODELO_LLM = "llama-3.1-8b-instant"
+MODELO_LLM = "openai/gpt-oss-20b"
 PROVEDOR = "groq"
 TEMPERATURA = 0.0
 MAX_TOKENS = 768
@@ -172,6 +172,7 @@ def executar_pergunta(pergunta: dict, qdrant, embedder, groq: Groq) -> dict:
                 model=MODELO_LLM,
                 temperature=TEMPERATURA,
                 max_completion_tokens=MAX_TOKENS,
+                reasoning_effort="low",
                 messages=[
                     {"role": "system", "content": INSTRUCOES_RAG_V1},
                     {"role": "user", "content": montar_prompt(pergunta["question"], chunks)},

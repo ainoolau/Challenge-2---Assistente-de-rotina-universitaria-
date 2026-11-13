@@ -1,0 +1,609 @@
+{
+  "contract_version": "1.0.0",
+  "golden_set_version": "1.0.0",
+  "scenario": "naive_rag",
+  "run_id": "naive_rag-da02e40a828a",
+  "generated_at": "2026-11-13T00:23:58.258854+00:00",
+  "config": {
+    "llm_model": "openai/gpt-oss-20b",
+    "llm_provider": "groq",
+    "temperature": 0.0,
+    "max_output_tokens": 768,
+    "prompt_template_id": "rag_v1",
+    "qdrant_collection": "rotina_estudante_multimodal",
+    "embedding_model": "paraphrase-multilingual-MiniLM-L12-v2",
+    "top_k": 3,
+    "guardrail_threshold": null,
+    "notes": "Naive RAG: retrieval da Sprint 2 e template rag_v1."
+  },
+  "results": [
+    {
+      "query_id": "GS-01",
+      "scenario": "naive_rag",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": "Não encontrei informações suficientes nos documentos disponíveis para responder a essa pergunta com segurança.",
+      "retrieved_chunks": [
+        {
+          "rank": 1,
+          "source": "calendario_academico_03.png",
+          "chunk_index": 1,
+          "task_type": "ocr",
+          "score": 0.64035547,
+          "text": "ro até o Gama\n06:45 - 08:00 . .\n(45 km) matinal (45 km) matinal (45 km)\nResidência IA: Daily, Sprint Planning e | Graduação: Estudo das materias da Residência IA: Desenvolvimento e Graduação: Estudo das materias da Residência IA: Revisão de Sprints e\n08:00 - 12:00 . .\nLab faculdade Experimentos faculdade Tech Review\nDeslocamento de volta (Gama ->\n12:00 - 14:00 Intervalo de Almoço Intervalo de Almoço Intervalo de Almoço Intervalo de Almoço Casa) (\nResidência IA: Hands-on / Pesquisa Trabalho Freel"
+        },
+        {
+          "rank": 2,
+          "source": "perfis_rotina_forms.txt",
+          "chunk_index": 1,
+          "task_type": "texto",
+          "score": 0.5583713,
+          "text": "gência Artificial - Centro Universitário IESB\n- Período/Semestre: 5º ou 6º período (6º período)\n- Jornadas Conciliadas: Trabalho CLT / Tempo integral (40h+), Residência Tecnológica / Acadêmica (segunda, quarta e sexta das 08h às 18h), Iniciação Científica (IC) / Pesquisa / Monitoria, Estudo autônomo por fora (cursos, certificações, concursos) e Cuidados domésticos / familiares.\n- Tempo Livre Diário Estimado (Segunda a Sexta): Entre 1 e 2 horas por dia.\n- Maior Gargalo na Gestão da Rotina: Falta "
+        },
+        {
+          "rank": 3,
+          "source": "audio_rotina_07.ogg",
+          "chunk_index": 0,
+          "task_type": "audio",
+          "score": 0.5091225,
+          "text": "Segunda e quarto a feira, eu tenho residência à inteligência artificial que vai dar 8 até 18. Tessa a feira e quinta a feira, eu tenho aula às 10 horas. Eu tenho circuitos polifásicos, às 2 horas eu tenho teoria da informação em as 4 horas. Eu tenho ela atromagnetismo. Se esta feira eu também tenho a residência interjeta artificial, mas ela vai apenas de 8 até meio dia."
+        }
+      ],
+      "sources": [],
+      "retrieval_scores": [
+        0.64035547,
+        0.5583713,
+        0.5091225
+      ],
+      "retrieval_latency_ms": 2078.94,
+      "generation_latency_ms": 493.11,
+      "total_latency_ms": 2572.25,
+      "input_tokens": 681,
+      "output_tokens": 33,
+      "abstained": true,
+      "guardrail": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "query_id": "GS-02",
+      "scenario": "naive_rag",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": "O valor da bolsa da Residência é de R$ 1.500,00 por parcela, totalizando R$ 12.000,00 ao longo do programa, e ela é paga em 8 (oito) parcelas. [edital_residencia_02.pdf]",
+      "retrieved_chunks": [
+        {
+          "rank": 1,
+          "source": "edital_residencia_02.pdf",
+          "chunk_index": 16,
+          "task_type": "texto",
+          "score": 0.6449363,
+          "text": "r os resultados da formação. \n4. Bolsa Residência \nO residente, desde que permaneça ativo no Programa e adimplente quanto às obrigações previstas neste \nPlano de Trabalho, fará jus ao recebimento de 8 (oito) parcelas da Bolsa de Residência, no valor \nindividual de R$ 1.500,00 (mil e quinhentos reais), totalizando R$ 12.000,00 (doze mil reais) ao longo do \nPrograma. \nAs parcelas serão distribuídas entre os dois módulos da residência, sendo 4 (quatro) parcelas no primeiro \nmódulo e 4 (quatro) parc"
+        },
+        {
+          "rank": 2,
+          "source": "edital_residencia_01.pdf",
+          "chunk_index": 9,
+          "task_type": "texto",
+          "score": 0.63271195,
+          "text": " de Residência em Software \nno valor total R$ 12.000,00 (Doze mil reais), a ser paga em 8 (oito) parcelas de \nR$ 1.500,00 (Mil e quinhentos reais) cada, que serão depositadas diretamente \nem conta corrente do BOLSISTA, em conformidade com as diretrizes, condições \ne critérios estabelecidos no respectivo Plano de Trabalho. \n \n3.1.1. O tipo da Bolsa poderá ser revisto a critério único e exclusivo do \nELDORADO.\n\n3 \n \n3.1.2. Caso o BOLSISTA venha a receber bolsa concedida por qualquer outra \ninstitu"
+        },
+        {
+          "rank": 3,
+          "source": "edital_residencia_02.pdf",
+          "chunk_index": 17,
+          "task_type": "texto",
+          "score": 0.39574474,
+          "text": "ro) parcelas no primeiro \nmódulo e 4 (quatro) parcelas no segundo módulo, condicionadas ao cumprimento das atividades e \ndemais obrigações previstas neste Plano de Trabalho. \nA concessão da Bolsa de Residência fica limitada a 8 (oito) parcelas. Eventual extensão do período de \nexecução do Programa para além de oito meses, inclusive em decorrência de recessos, ajustes de\n\nPágina 5 \ncalendário ou outras situações que impliquem a prorrogação de sua duração, não dará direito ao \nrecebimento de parce"
+        }
+      ],
+      "sources": [
+        "edital_residencia_02.pdf"
+      ],
+      "retrieval_scores": [
+        0.6449363,
+        0.63271195,
+        0.39574474
+      ],
+      "retrieval_latency_ms": 2080.88,
+      "generation_latency_ms": 577.25,
+      "total_latency_ms": 2658.27,
+      "input_tokens": 694,
+      "output_tokens": 79,
+      "abstained": false,
+      "guardrail": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "query_id": "GS-03",
+      "scenario": "naive_rag",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": "O residente que acumular 3 (três) advertências será desligado do Programa. [edital_residencia_02.pdf]",
+      "retrieved_chunks": [
+        {
+          "rank": 1,
+          "source": "edital_residencia_02.pdf",
+          "chunk_index": 27,
+          "task_type": "texto",
+          "score": 0.7479725,
+          "text": "ntação necessária para sua regularização. \nO residente que acumular 3 (três) advertências será desligado do Programa. \nO limite de 3 (três) advertências não impede o desligamento antecipado. Dependendo da natureza, \ngravidade, consequências ou reincidência da conduta, o residente poderá ser desligado antes de atingir \nesse limite.\n\nPágina 7 \nNa avaliação da gravidade poderão ser considerados: \na) se a conduta colocou em risco ou causou danos a outras pessoas, equipamentos ou instalações; \nb) se "
+        },
+        {
+          "rank": 2,
+          "source": "edital_residencia_02.pdf",
+          "chunk_index": 30,
+          "task_type": "texto",
+          "score": 0.69823265,
+          "text": "dependentemente do número de advertências: \na) agressão, ameaça, assédio ou discriminação; \nb) furto, apropriação indevida ou dano intencional a equipamentos ou instalações; \nc) tentativa de acesso não autorizado a sistemas, redes, arquivos ou contas; \nd) alteração deliberada de mecanismos de segurança dos equipamentos ou sistemas; \ne) qualquer outra conduta grave incompatível com a continuidade no Programa. \nAs ocorrências serão avaliadas considerando os fatos, as evidências disponíveis, o cont"
+        },
+        {
+          "rank": 3,
+          "source": "edital_residencia_02.pdf",
+          "chunk_index": 26,
+          "task_type": "texto",
+          "score": 0.6941886,
+          "text": "ltados; \ng) utilização indevida de equipamentos, sistemas, contas ou informações. \n \n5.4 \nAdvertências e Desligamento \nO descumprimento das especificações deste Plano de Trabalho ou das orientações formais do Programa \npoderá resultar em advertência ou, conforme a gravidade da conduta, em desligamento. \nToda advertência será comunicada ao residente, formalizada e registrada, contendo a descrição objetiva \nda ocorrência e, quando aplicável, a orientação necessária para sua regularização. \nO resid"
+        }
+      ],
+      "sources": [
+        "edital_residencia_02.pdf"
+      ],
+      "retrieval_scores": [
+        0.7479725,
+        0.69823265,
+        0.6941886
+      ],
+      "retrieval_latency_ms": 2070.41,
+      "generation_latency_ms": 352.42,
+      "total_latency_ms": 2422.95,
+      "input_tokens": 632,
+      "output_tokens": 52,
+      "abstained": false,
+      "guardrail": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "query_id": "GS-04",
+      "scenario": "naive_rag",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": "As regras para retirada e devolução dos equipamentos da Residência são:\n\n1. **Retirada**  \n   - O residente deve retirar o equipamento no início das atividades.  \n   - Deve verificar seu estado no momento do recebimento.  \n   - Qualquer avaria identificada deve ser comunicada imediatamente.  \n\n2. **Devolução**  \n   - O equipamento deve ser devolvido ao final das atividades.  \n   - Todos os acessórios recebidos (carregador, cabo de energia e adaptadores) devem ser devolvidos junto com o equipamento.  \n\nEssas informações são retiradas do trecho 1 do arquivo **[edital_residencia_02.pdf]**.",
+      "retrieved_chunks": [
+        {
+          "rank": 1,
+          "source": "edital_residencia_02.pdf",
+          "chunk_index": 32,
+          "task_type": "texto",
+          "score": 0.63275003,
+          "text": "do para as atividades, não \nsendo permitida sua retirada sem autorização prévia da coordenação.\n\nPágina 8 \n5.5.2 Retirada e devolução \nO residente deverá: \na) retirar o equipamento no início das atividades; \nb) verificar seu estado no momento do recebimento; \nc) comunicar imediatamente qualquer avaria identificada; \nd) devolver o equipamento ao final das atividades; \ne) devolver todos os acessórios recebidos, incluindo carregador, cabo de energia e adaptadores. \n5.5.3 Cuidados durante o uso \nO r"
+        },
+        {
+          "rank": 2,
+          "source": "edital_residencia_01.pdf",
+          "chunk_index": 14,
+          "task_type": "texto",
+          "score": 0.59866524,
+          "text": "26 a 16/04/2027 podendo ser prorrogado, \npor acordo entre as partes, mediante Adendo a este instrumento.\n\n4 \n6. CLÁUSULA SEXTA – DA RESCISÃO \n6.1. Qualquer uma das Partes poderá denunciar o presente instrumento desde que \nmediante comunicação prévia à outra parte com antecedência mínima de 30 \n(trinta) dias. \n6.2. O descumprimento de qualquer das obrigações assumidas importará no \ncancelamento automático deste instrumento, mediante simples notificação por \nescrito à parte infratora. \n6.2.1. O at"
+        },
+        {
+          "rank": 3,
+          "source": "edital_residencia_02.pdf",
+          "chunk_index": 31,
+          "task_type": "texto",
+          "score": 0.56734896,
+          "text": "erando os fatos, as evidências disponíveis, o contexto, a gravidade e \neventual reincidência. \n \n5.5 \nUtilização de Equipamentos e Espaços \nOs computadores, carregadores, cabos, adaptadores e demais acessórios disponibilizados destinam-se às \natividades do Programa e deverão ser utilizados exclusivamente nos locais e condições autorizados. \n5.5.1  Permanência no laboratório/sala \nOs equipamentos deverão permanecer no laboratório ou espaço designado para as atividades, não \nsendo permitida sua re"
+        }
+      ],
+      "sources": [
+        "edital_residencia_02.pdf"
+      ],
+      "retrieval_scores": [
+        0.63275003,
+        0.59866524,
+        0.56734896
+      ],
+      "retrieval_latency_ms": 2062.22,
+      "generation_latency_ms": 467.57,
+      "total_latency_ms": 2529.92,
+      "input_tokens": 663,
+      "output_tokens": 168,
+      "abstained": false,
+      "guardrail": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "query_id": "GS-05",
+      "scenario": "naive_rag",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": "Não encontrei informações suficientes nos documentos disponíveis para responder a essa pergunta com segurança.",
+      "retrieved_chunks": [
+        {
+          "rank": 1,
+          "source": "calendario_academico_02.pdf",
+          "chunk_index": 2,
+          "task_type": "texto",
+          "score": 0.6147624,
+          "text": "59 do dia \n28/07/2026. \nSTI \n29/07 e 30/07/2026 \nProcessamento das matrículas. \nSTI \n30/07/2026 \nResultado da matrícula até às 12h do dia 30/07/2026. \nCoordenação \n30/07 a 03/08/2026 \nAjuste de vagas em turmas ofertadas (preparação para a rematrícula) de 14h do dia 30/07 até 23h59 do dia \n03/08/2026. \nEstudante \n03/08 e 04/08/2026 \nSolicitação de Rematrícula de 07h do dia 03/08 até 23h59 do dia 04/08/2026 no SIGAA > Portal Discente > \nEnsino > Matrícula on-line > Realizar Matrícula. \nCoordenação"
+        },
+        {
+          "rank": 2,
+          "source": "calendario_academico_02.pdf",
+          "chunk_index": 8,
+          "task_type": "texto",
+          "score": 0.6127405,
+          "text": "o e aluno” (recomendamos a leitura do manual disponível na página \nSAA - Peticionamento Eletrônico (unb.br). \nDEG/DAIA \nAté 09/09/2026 \nData limite para reingresso no 2026.2, desde que o processo tenha sido analisado pelo DEG. \nMOBILIDADE ACADÊMICA \nANDIFES \nEstudante/Coordenação \nAté 31/10/2026 \nEnvio das solicitações de mobilidade acadêmica em 2026.2 para as IFES de destino. \n \n \nObservação: Além do prazo estabelecido acima, estudantes/coordenações da UnB devem se atentar aos \nprazos/calendári"
+        },
+        {
+          "rank": 3,
+          "source": "calendario_academico_02.pdf",
+          "chunk_index": 11,
+          "task_type": "texto",
+          "score": 0.5578582,
+          "text": "curso/. Solicitação por meio do formulário eletrônico. \nSEMANA UNIVERSITÁRIA 2026 DEX \n20/09 a 25/09/2026 \nAs inscrições para a SemUni UnB 2026 serão divulgadas em momento oportuno por meio da página https://dex.unb.br/. \nAs atividades ofertadas são gratuitas e abertas ao público e ocorrerão no período de 20/09 a 25/09/2026.  \nTRANCAMENTO PARCIAL DE \nMATRÍCULA AUTOMÁTICO \nEstudante \nAté 09/10/2026 \nSuspensão das atividades curriculares de um componente curricular apenas ou de um grupo de compone"
+        }
+      ],
+      "sources": [],
+      "retrieval_scores": [
+        0.6147624,
+        0.6127405,
+        0.5578582
+      ],
+      "retrieval_latency_ms": 2229.89,
+      "generation_latency_ms": 442.13,
+      "total_latency_ms": 2672.08,
+      "input_tokens": 796,
+      "output_tokens": 43,
+      "abstained": true,
+      "guardrail": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "query_id": "GS-06",
+      "scenario": "naive_rag",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": "Não encontrei informações suficientes nos documentos disponíveis para responder a essa pergunta com segurança.",
+      "retrieved_chunks": [
+        {
+          "rank": 1,
+          "source": "edital_residencia_02.pdf",
+          "chunk_index": 18,
+          "task_type": "texto",
+          "score": 0.6731721,
+          "text": "duração, não dará direito ao \nrecebimento de parcelas adicionais. \nEventuais pendências ou atrasos injustificados no cumprimento das atividades e entregas previstas, bem \ncomo no envio de recibos, documentos ou demais informações necessárias à regular execução do \nPrograma, poderão implicar a suspensão do pagamento da Bolsa de Residência até a respectiva \nregularização. Em situações de descumprimento reiterado ou de maior gravidade, poderão ser aplicadas \nas medidas previstas neste Plano de Trab"
+        },
+        {
+          "rank": 2,
+          "source": "edital_residencia_02.pdf",
+          "chunk_index": 17,
+          "task_type": "texto",
+          "score": 0.61170256,
+          "text": "ro) parcelas no primeiro \nmódulo e 4 (quatro) parcelas no segundo módulo, condicionadas ao cumprimento das atividades e \ndemais obrigações previstas neste Plano de Trabalho. \nA concessão da Bolsa de Residência fica limitada a 8 (oito) parcelas. Eventual extensão do período de \nexecução do Programa para além de oito meses, inclusive em decorrência de recessos, ajustes de\n\nPágina 5 \ncalendário ou outras situações que impliquem a prorrogação de sua duração, não dará direito ao \nrecebimento de parce"
+        },
+        {
+          "rank": 3,
+          "source": "edital_residencia_01.pdf",
+          "chunk_index": 15,
+          "task_type": "texto",
+          "score": 0.5644654,
+          "text": "cação por \nescrito à parte infratora. \n6.2.1. O atraso na entrega dos relatórios previstos na cláusula 2.2, desde que \nsuperior a 30 (trinta) dias e não devidamente justificado, poderá \nacarretar a suspensão ou o cancelamento deste instrumento. \n6.2.2. No caso de ocorrência de caso fortuito ou de força maior que impeça o \ncumprimento das obrigações ora estipuladas, as partes não serão \nconsideradas inadimplentes. \n \n7. CLÁUSULA SÉTIMA – DO FORO \n7.1. Fica eleito o Fórum da Comarca de Brasília, c"
+        }
+      ],
+      "sources": [],
+      "retrieval_scores": [
+        0.6731721,
+        0.61170256,
+        0.5644654
+      ],
+      "retrieval_latency_ms": 2076.93,
+      "generation_latency_ms": 506.29,
+      "total_latency_ms": 2583.3,
+      "input_tokens": 671,
+      "output_tokens": 47,
+      "abstained": true,
+      "guardrail": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "query_id": "GS-07",
+      "scenario": "naive_rag",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": "Sim. De acordo com o trecho 1, os componentes curriculares do tipo atividade “pela sua natureza possuem horário livre, porém, exigem dedicação do estudante em período integral, de segunda a sábado” [grade_aluno_06.jpg].",
+      "retrieved_chunks": [
+        {
+          "rank": 1,
+          "source": "grade_aluno_06.jpg",
+          "chunk_index": 3,
+          "task_type": "ocr",
+          "score": 0.6579398,
+          "text": " ZOOLOGIA INVERTEBRADOS 02 MATRICULADO(A) 5N1234\nPAULO CESAR MOTTA e FELIPE MALHEIROS GAWRYSZEWSKI\nTipo: DISCIPLINA Local: IB HT 07/08\n* Componentes curriculares do tipo atividade pela sua natureza possuem horário livre, porém, exigem dedicação do estudante em período\nintegral, de segunda a sábado, podendo ser necessário o deslocamento do discente para universidade, campo de estágio ou de pesquisa\ntodos os dias.\nTABELA DE HORÁRIOS:\n| torários | Om O e rr e e e co 2\n10:00 -10:55 E ECLOOS crso049 "
+        },
+        {
+          "rank": 2,
+          "source": "edital_residencia_02.pdf",
+          "chunk_index": 14,
+          "task_type": "texto",
+          "score": 0.6378813,
+          "text": " seu processo de \naprendizagem e desenvolvimento profissional. \n• \nAcompanhamento contínuo da evolução técnica e comportamental, considerando a \nparticipação nas atividades de capacitação e desenvolvimento prático. \n• \nRegistro periódico das atividades desenvolvidas, das competências adquiridas e dos resultados \nalcançados. \n• \nElaboração de registros e relatórios de acompanhamento, contemplando atividades realizadas, \naprendizados obtidos e oportunidades de aprimoramento. \n• \nParticipação em se"
+        },
+        {
+          "rank": 3,
+          "source": "perfis_rotina_forms.txt",
+          "chunk_index": 16,
+          "task_type": "texto",
+          "score": 0.5990158,
+          "text": "s pela manhã, terças e quintas à tarde) e Cuidados domésticos / familiares.\n- Tempo Livre Diário Estimado (Segunda a Sexta): Entre 2 e 4 horas por dia.\n- Maior Gargalo na Gestão da Rotina: Conflito de horários entre trabalho/estágio/residência e faculdade.\n- Dia Mais Cheio da Semana: Quarta-feira (estágio pela manhã e bloco contínuo de 5 horários de Prática de Pesquisa Histórica das 14h00 às 18h55; além de aulas às terças, quintas, sextas e sábados pela manhã).\n- Documentos Associados na Base: g"
+        }
+      ],
+      "sources": [
+        "grade_aluno_06.jpg"
+      ],
+      "retrieval_scores": [
+        0.6579398,
+        0.6378813,
+        0.5990158
+      ],
+      "retrieval_latency_ms": 2061.36,
+      "generation_latency_ms": 485.17,
+      "total_latency_ms": 2546.67,
+      "input_tokens": 685,
+      "output_tokens": 75,
+      "abstained": false,
+      "guardrail": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "query_id": "GS-08",
+      "scenario": "naive_rag",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": "Os monitores devem estar presentes nos dias de aulas práticas. No caso do noturno (turma 3), como há muitos monitores, eles podem se revezar para cobrir as aulas. [comunicado_monitoria_05.jpg]",
+      "retrieved_chunks": [
+        {
+          "rank": 1,
+          "source": "comunicado_monitoria_05.jpg",
+          "chunk_index": 0,
+          "task_type": "ocr",
+          "score": 0.5203416,
+          "text": "23:21 8,7 (O + X Sul\ne ap Monitores IAV 2026.2 Mm, .\nv Q\ne\na ri 11:44\nCriei esse grupo para facilitar o contato\ncom os monitores e monitoras desse\nsemestre 11:45\nRetomamos as aulas esse semestre, e\njá disponibilizei no SIGAA das turmas o\ncronograma revisado, com as datas de\naulas práticas. 11:45\nConforme mencionado em e-mail anterior,\nos monitores devem estar presentes nos\ndias de aulas práticas. No caso do noturno\n(turma 3), como temos muitos monitores,\nvocês podem se revezar para cobrir as\naul"
+        },
+        {
+          "rank": 2,
+          "source": "grade_aluno_06.jpg",
+          "chunk_index": 3,
+          "task_type": "ocr",
+          "score": 0.5183056,
+          "text": " ZOOLOGIA INVERTEBRADOS 02 MATRICULADO(A) 5N1234\nPAULO CESAR MOTTA e FELIPE MALHEIROS GAWRYSZEWSKI\nTipo: DISCIPLINA Local: IB HT 07/08\n* Componentes curriculares do tipo atividade pela sua natureza possuem horário livre, porém, exigem dedicação do estudante em período\nintegral, de segunda a sábado, podendo ser necessário o deslocamento do discente para universidade, campo de estágio ou de pesquisa\ntodos os dias.\nTABELA DE HORÁRIOS:\n| torários | Om O e rr e e e co 2\n10:00 -10:55 E ECLOOS crso049 "
+        },
+        {
+          "rank": 3,
+          "source": "edital_residencia_02.pdf",
+          "chunk_index": 7,
+          "task_type": "texto",
+          "score": 0.45433742,
+          "text": "As \natividades compreenderão: \n• \nParticipação em aulas, discussões técnicas, workshops, treinamentos, palestras e demais ações \nde capacitação sobre Inteligência Artificial, aprendizado de máquina, IA generativa e áreas \ncorrelatas. \n• \nRealização de estudos dirigidos, laboratórios e atividades de aprofundamento orientadas pelos \nmentores. \n• \nDesenvolvimento de estudos, experimentos e atividades práticas para consolidação dos \nconhecimentos adquiridos. \n• \nProdução de documentação, apresentaçõ"
+        }
+      ],
+      "sources": [
+        "comunicado_monitoria_05.jpg"
+      ],
+      "retrieval_scores": [
+        0.5203416,
+        0.5183056,
+        0.45433742
+      ],
+      "retrieval_latency_ms": 2054.86,
+      "generation_latency_ms": 430.04,
+      "total_latency_ms": 2485.01,
+      "input_tokens": 718,
+      "output_tokens": 80,
+      "abstained": false,
+      "guardrail": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "query_id": "GS-09",
+      "scenario": "naive_rag",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": "A aula de Econometria ocorre nas terças e quartas-feiras, das 08h às 09h50. [perfils_rotina_forms.txt]",
+      "retrieved_chunks": [
+        {
+          "rank": 1,
+          "source": "perfis_rotina_forms.txt",
+          "chunk_index": 11,
+          "task_type": "texto",
+          "score": 0.6621439,
+          "text": "inta-feira (Seg/Qua com Teoria Política Moderna das 16h às 17h50 e Contabilidade Nacional das 19h às 20h40; Ter/Qui com Econometria das 08h às 09h50, Microeconomia 1 das 10h às 11h50 e reuniões de pesquisa/monitoria à tarde).\n- Documentos Associados na Base: grade_aluno_05.jpeg, audio_rotina_05.wav.\n\n---\n\n## Perfil Estudante 06 (aluno_06)\n- Curso e Instituição: Ciências Biológicas - Universidade de Brasília (UnB)\n- Período/Semestre: 7º ou 8º período (7º semestre)\n- Jornadas Conciliadas: Iniciaçã"
+        },
+        {
+          "rank": 2,
+          "source": "calendario_academico_01.pdf",
+          "chunk_index": 2,
+          "task_type": "texto",
+          "score": 0.53837717,
+          "text": "26 a 21/11/2026: Avaliação F2 - Período de aplicação das avaliações de aprendizagem (F2) das disciplinas híbridas (HMDC).\n- 16/11/2026 a 10/01/2027: Sessão Solene de Colação de Grau - Período para solicitação.\n- 20/11/2026: Feriado Nacional - Dia da Consciência Negra.\n- 23/11/2026: Diploma - Início do período para solicitação.\n- 23/11/2026 a 28/11/2026: Avaliação F2 - Período de aplicação das avaliações de aprendizagem (F2) das demais disciplinas dos cursos presenciais.\n- 30/11/2026: Feriado Dis"
+        },
+        {
+          "rank": 3,
+          "source": "perfis_rotina_forms.txt",
+          "chunk_index": 9,
+          "task_type": "texto",
+          "score": 0.5319997,
+          "text": "ia em IA das 08h às 18h, aulas da graduação como Fundamentos de Sistemas Embarcados às 10h e às 14h, e Iniciação Científica das 12h às 14h e das 18h às 20h).\n- Documentos Associados na Base: grade_aluno_04.pdf, audio_rotina_04.wav, edital_residencia_01.pdf, edital_residencia_02.pdf, calendario_academico_02.pdf.\n\n---\n\n## Perfil Estudante 05 (aluno_05)\n- Curso e Instituição: Ciências Econômicas - Universidade de Brasília (UnB)\n- Período/Semestre: 5º ou 6º período\n- Jornadas Conciliadas: Iniciação "
+        }
+      ],
+      "sources": [],
+      "retrieval_scores": [
+        0.6621439,
+        0.53837717,
+        0.5319997
+      ],
+      "retrieval_latency_ms": 2069.6,
+      "generation_latency_ms": 366.15,
+      "total_latency_ms": 2435.85,
+      "input_tokens": 777,
+      "output_tokens": 78,
+      "abstained": false,
+      "guardrail": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "query_id": "GS-10",
+      "scenario": "naive_rag",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": "O estudante de TI que faz Residência e trabalho CLT vai para a academia nas segundas, quartas e sextas, das 08h às 18h. [perfis_rotina_forms.txt]",
+      "retrieved_chunks": [
+        {
+          "rank": 1,
+          "source": "perfis_rotina_forms.txt",
+          "chunk_index": 9,
+          "task_type": "texto",
+          "score": 0.6388659,
+          "text": "ia em IA das 08h às 18h, aulas da graduação como Fundamentos de Sistemas Embarcados às 10h e às 14h, e Iniciação Científica das 12h às 14h e das 18h às 20h).\n- Documentos Associados na Base: grade_aluno_04.pdf, audio_rotina_04.wav, edital_residencia_01.pdf, edital_residencia_02.pdf, calendario_academico_02.pdf.\n\n---\n\n## Perfil Estudante 05 (aluno_05)\n- Curso e Instituição: Ciências Econômicas - Universidade de Brasília (UnB)\n- Período/Semestre: 5º ou 6º período\n- Jornadas Conciliadas: Iniciação "
+        },
+        {
+          "rank": 2,
+          "source": "perfis_rotina_forms.txt",
+          "chunk_index": 5,
+          "task_type": "texto",
+          "score": 0.63678956,
+          "text": "--\n\n## Perfil Estudante 03 (aluno_03)\n- Curso e Instituição: Tecnologia da Informação - Universidade Federal de Mato Grosso do Sul (UFMS)\n- Período/Semestre: 9º período ou superior (93,04% da carga horária cumprida)\n- Jornadas Conciliadas: Trabalho CLT / Tempo integral (40h+, terças e quintas das 08h às 18h), Residência Tecnológica / Acadêmica (segundas, quartas e sextas das 08h às 18h), Estudo autônomo por fora e Cuidados domésticos / familiares.\n- Tempo Livre Diário Estimado (Segunda a Sexta):"
+        },
+        {
+          "rank": 3,
+          "source": "perfis_rotina_forms.txt",
+          "chunk_index": 16,
+          "task_type": "texto",
+          "score": 0.6134423,
+          "text": "s pela manhã, terças e quintas à tarde) e Cuidados domésticos / familiares.\n- Tempo Livre Diário Estimado (Segunda a Sexta): Entre 2 e 4 horas por dia.\n- Maior Gargalo na Gestão da Rotina: Conflito de horários entre trabalho/estágio/residência e faculdade.\n- Dia Mais Cheio da Semana: Quarta-feira (estágio pela manhã e bloco contínuo de 5 horários de Prática de Pesquisa Histórica das 14h00 às 18h55; além de aulas às terças, quintas, sextas e sábados pela manhã).\n- Documentos Associados na Base: g"
+        }
+      ],
+      "sources": [
+        "perfis_rotina_forms.txt"
+      ],
+      "retrieval_scores": [
+        0.6388659,
+        0.63678956,
+        0.6134423
+      ],
+      "retrieval_latency_ms": 2073.88,
+      "generation_latency_ms": 348.54,
+      "total_latency_ms": 2422.56,
+      "input_tokens": 748,
+      "output_tokens": 103,
+      "abstained": false,
+      "guardrail": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "query_id": "GS-11",
+      "scenario": "naive_rag",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": "Não encontrei informações suficientes nos documentos disponíveis para responder a essa pergunta com segurança.",
+      "retrieved_chunks": [
+        {
+          "rank": 1,
+          "source": "perfis_rotina_forms.txt",
+          "chunk_index": 16,
+          "task_type": "texto",
+          "score": 0.6703689,
+          "text": "s pela manhã, terças e quintas à tarde) e Cuidados domésticos / familiares.\n- Tempo Livre Diário Estimado (Segunda a Sexta): Entre 2 e 4 horas por dia.\n- Maior Gargalo na Gestão da Rotina: Conflito de horários entre trabalho/estágio/residência e faculdade.\n- Dia Mais Cheio da Semana: Quarta-feira (estágio pela manhã e bloco contínuo de 5 horários de Prática de Pesquisa Histórica das 14h00 às 18h55; além de aulas às terças, quintas, sextas e sábados pela manhã).\n- Documentos Associados na Base: g"
+        },
+        {
+          "rank": 2,
+          "source": "grade_aluno_01.pdf",
+          "chunk_index": 1,
+          "task_type": "texto",
+          "score": 0.6597922,
+          "text": "eligência Artificial, deste Centro Universitário IESB, nas disciplinas e horários\nabaixo especificados:  \n  \nDia da Semana\nHorário\nTurma\nDisciplina\nInício\nTérmino\nTerça-Feira\n18:00\n19:15\nCIANM3B\nAmostragem Aplicada\nSexta-Feira\n18:00\n19:15\nCIANM3B\nAmostragem Aplicada\nSegunda-Feira\n19:15\n20:30\nCIANM3B\nAprendizagem de Máquina\npara Ciências de Dados\nSegunda-Feira\n20:45\n22:00\nCIANM3B\nAprendizagem de Máquina\npara Ciências de Dados\nSegunda-Feira\n18:00\n19:15\nCIANM2B\nProjeto Integrador Aplicado\nem CD & I"
+        },
+        {
+          "rank": 3,
+          "source": "perfis_rotina_forms.txt",
+          "chunk_index": 4,
+          "task_type": "texto",
+          "score": 0.64441407,
+          "text": "ta): Entre 1 e 2 horas por dia.\n- Maior Gargalo na Gestão da Rotina: Esquecimento de prazos de entregas, provas e editais.\n- Dia Mais Cheio da Semana: Quarta-feira (Residência presencial das 08h às 18h + deslocamento + aulas imersivas de Fundamentos de Redes de Computadores das 18h às 19h e Processos de Teste de Software das 19h30 às 20h45).\n- Documentos Associados na Base: grade_aluno_02.jpeg, audio_rotina_02.mp3, calendario_academico_03.png.\n\n---\n\n## Perfil Estudante 03 (aluno_03)\n- Curso e In"
+        }
+      ],
+      "sources": [],
+      "retrieval_scores": [
+        0.6703689,
+        0.6597922,
+        0.64441407
+      ],
+      "retrieval_latency_ms": 2066.86,
+      "generation_latency_ms": 424.11,
+      "total_latency_ms": 2491.05,
+      "input_tokens": 783,
+      "output_tokens": 62,
+      "abstained": true,
+      "guardrail": null,
+      "status": "success",
+      "error": null
+    },
+    {
+      "query_id": "GS-12",
+      "scenario": "naive_rag",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "answer": "Não encontrei informações suficientes nos documentos disponíveis para responder a essa pergunta com segurança.",
+      "retrieved_chunks": [
+        {
+          "rank": 1,
+          "source": "perfis_rotina_forms.txt",
+          "chunk_index": 0,
+          "task_type": "texto",
+          "score": 0.43283695,
+          "text": "# PERFIS E ROTINAS DOS ESTUDANTES UNIVERSITÁRIOS EM MULTIJORNADA (COLETA FORMULÁRIO RAG)\n\nEste documento consolida os perfis estruturados e anonimizados dos 8 estudantes universitários participantes do levantamento de rotina em multijornada (Semestre 2026.2). Todos os participantes assinaram o Termo de Consentimento Livre e Esclarecido (LGPD / Uso Acadêmico).\n\n---\n\n## Perfil Estudante 01 (aluno_01)\n- Curso e Instituição: Ciência de Dados e Inteligência Artificial - Centro Universitário IESB\n- Pe"
+        },
+        {
+          "rank": 2,
+          "source": "calendario_academico_02.pdf",
+          "chunk_index": 13,
+          "task_type": "texto",
+          "score": 0.42235097,
+          "text": "olidação das Turmas no SIGAA. \nDESLIGAMENTO \nSAA \n21/12/2026 \nProcessamento dos desligamentos (dos estudantes que deverão ser desligados) referente ao semestre 2026.2.  \nREVISÃO DE MENÇÃO FINAL \nEstudante \nA definir \nSolicitação nas Unidades Acadêmicas. \nDocente \n \nAnálise pelo Corpo Docente (até quinze dias a partir da solicitação do aluno). \n \nInformações Complementares \nAPROVEITAMENTO DE \nESTUDOS \nEstudante \nA qualquer momento \nSolicitação via peticionamento eletrônico (recomendamos a leitura"
+        },
+        {
+          "rank": 3,
+          "source": "calendario_academico_02.pdf",
+          "chunk_index": 20,
+          "task_type": "texto",
+          "score": 0.4201066,
+          "text": "- Natal \n31/12 - Ponto Facultativo após 13h  \n \nLEGENDA \n \n \n \nDatas Acadêmicas \n \n \n \nPeríodos de matrícula \n \n \nFeriados  \n \n \n \nPontos Facultativos \n \n \n \nSemana Universitária 2026"
+        }
+      ],
+      "sources": [],
+      "retrieval_scores": [
+        0.43283695,
+        0.42235097,
+        0.4201066
+      ],
+      "retrieval_latency_ms": 2049.72,
+      "generation_latency_ms": 347.79,
+      "total_latency_ms": 2397.57,
+      "input_tokens": 612,
+      "output_tokens": 34,
+      "abstained": true,
+      "guardrail": null,
+      "status": "success",
+      "error": null
+    }
+  ]
+}
