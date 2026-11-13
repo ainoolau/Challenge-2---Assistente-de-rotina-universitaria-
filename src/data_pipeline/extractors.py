@@ -9,11 +9,14 @@ import pymupdf
 import pytesseract
 import whisper
 from docx import Document
+from dotenv import load_dotenv
 from PIL import Image
 
-# EXTRAÇÃO DE TEXTO DE IMAGENS
+# Carrega as configurações do arquivo .env
+RAIZ = Path(__file__).resolve().parents[2]
+load_dotenv(RAIZ / ".env")
 
-# Configuração do caminho do Tesseract.
+# Configura o caminho do Tesseract
 caminho_tesseract = os.getenv("TESSERACT_CMD")
 
 if caminho_tesseract:
