@@ -25,11 +25,11 @@ O conflito entre CLT e aula foi mantido e sinalizado, sem mover compromissos.
 
 ## Verificações
 
-- 31 testes novos de contratos, handoffs, limite de correção, gate, citações,
+- 32 testes novos de contratos, handoffs, limite de correção, gate, citações,
   refinamento, erro sanitizado, uso de tokens, agenda e CLI.
 - Teste com 50 agendas geradas com seed fixa verifica invariantes e contabilização.
 - Teste de transição de horário de verão verifica sono atravessando a meia-noite.
-- Suíte combinada com zero-shot, Golden Set e smoke: 80 testes aprovados.
+- Suíte combinada com zero-shot, Golden Set e smoke: 81 testes aprovados.
 - Ruff check no repositório e Ruff format aprovados.
 - MyPy no src: sem erros em 17 arquivos, como no comando do CI.
 - CI atualizado para instalar Pydantic e executar a nova suíte.
@@ -56,3 +56,33 @@ aprovação. Resultados anteriores permanecem locais para auditoria.
 Os traces completos ficam em reports/multiagents e não são publicados no Git.
 O quadro final e o pacote local selecionam execuções explicitamente identificadas;
 a demonstração simulada não é apresentada como execução de Groq.
+
+
+## Quadro da demonstração final
+
+Pacing configurado em 15 segundos; valores em milissegundos. A coluna HTTP soma
+as chamadas individuais, incluindo transporte/parsing, sem o pacing.
+
+| Cenário | Modo | Estado | Chamadas | Tempo total | Espera por cota | Soma HTTP | Tokens entrada / saída |
+|---|---|---|---:|---:|---:|---:|---|
+| documental | live | completed | 4 | 45713.83 | 41252.34 | 4207.18 | 4502 / 383 |
+| planejamento | live | completed | 4 | 60616.62 | 57037.76 | 3477.06 | 4862 / 608 |
+| fora_dominio | live | abstained | 0 | 30.10 | 0.00 | 0.00 | 0 / 0 |
+| correcao | simulated | completed | 4 | 0.23 | 0.00 | 0.00 | None / None |
+
+Na consulta documental, a regra de três advertências foi recuperada; a frequência
+mínima permaneceu como lacuna mesmo após refinamento. Estado completed significa
+que a colaboração terminou com resposta auditada, não cobertura completa da
+pergunta ou precisão de 100%. Esse caso aponta melhoria pendente do retrieval.
+
+No planejamento, foram sugeridos cinco blocos somando 240 minutos, sem novos
+conflitos, com sono e compromissos fixos protegidos. O conflito original CLT/aula
+foi sinalizado. Não houve alteração de agenda. No caso negativo, o score medido
+foi 0,43283698491196365 e o gate bloqueou a geração.
+
+Os traces selecionados são:
+
+- `reports/multiagents/live/multiagent-4cb583d41d294c7abd7bfd04a47d2108/documental.json`
+- `reports/multiagents/live/multiagent-92fd7a9f51c44470aa3a600c5fba63cc/planejamento.json`
+- `reports/multiagents/live/multiagent-cb8fb3b9fe8e4f9f9136aeb31b4e8dd2/fora_dominio.json`
+- `reports/multiagents/simulated/multiagent-08dc545bd05b4739ab299b4157b2bb91/correcao.json`

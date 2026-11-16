@@ -425,3 +425,8 @@ def test_groq_failed_structured_output_keeps_known_usage(monkeypatch, finish, co
     assert llm.calls[0]["status"] == "error"
     assert llm.calls[0]["input_tokens"] == 12
     assert llm.calls[0]["output_tokens"] == 40
+
+
+def test_run_id_cannot_escape_output_directory():
+    with pytest.raises(ValidationError):
+        AgentRequest(question="Pergunta documental?", run_id="../../outside")

@@ -46,7 +46,10 @@ class StudyGoal(Contract):
 
 
 class AgentRequest(Contract):
-    run_id: str = Field(default_factory=lambda: "multiagent-" + uuid4().hex)
+    run_id: str = Field(
+        default_factory=lambda: "multiagent-" + uuid4().hex,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+    )
     question: str = Field(min_length=5, max_length=4000)
     timezone: str = "America/Sao_Paulo"
     schedule_slots: list[ScheduleSlot] = Field(default_factory=list, max_length=500)
