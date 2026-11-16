@@ -52,3 +52,10 @@ Assistente inteligente para universitários em multijornada (faculdade, trabalho
 
 O executor independente `scripts/scenarios/zero_shot.py` usa Groq ou Ollama sem recuperação
 documental. Consulte [configuração, contrato oficial e execução](docs/zero_shot.md).
+
+### Sistema multiagentes
+
+`python scripts/demo_multiagents.py` executa quatro cenários simulados de pesquisa,
+síntese, validação e planejamento. Para Groq/Qdrant reais, consulte
+[execução e validação](docs/multiagent_execution.md) e
+[arquitetura e contratos](docs/multiagent_architecture.md).
