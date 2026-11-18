@@ -84,3 +84,6 @@ dist/
 
 # Pesos de modelos locais (TASK-06)
 models/
+
+# Traces multiagentes podem conter evidências e agendas privadas
+reports/multiagents/
