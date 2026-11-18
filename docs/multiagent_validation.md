@@ -86,3 +86,19 @@ Os traces selecionados são:
 - `reports/multiagents/live/multiagent-92fd7a9f51c44470aa3a600c5fba63cc/planejamento.json`
 - `reports/multiagents/live/multiagent-cb8fb3b9fe8e4f9f9136aeb31b4e8dd2/fora_dominio.json`
 - `reports/multiagents/simulated/multiagent-08dc545bd05b4739ab299b4157b2bb91/correcao.json`
+
+
+## Revisão de 18/11/2026
+
+Restaurados os comandos de ambiente virtual, requirements e Docker Compose no README,
+com o modelo multilíngue correto. O carregamento de GROQ_API_KEY agora pertence a
+src/agents/llm.py e preserva o ambiente existente, sem importar scripts de benchmark.
+Buscas simples continuam com até três chunks; buscas compostas e refinamentos
+retêm até cinco, com deduplicação e identificadores únicos. Testes controlados
+cobrem ambos os limites e a preservação de evidência com score menor.
+
+Os resultados reais acima são históricos, anteriores à ampliação do limite.
+Não foi feita nova chamada à Groq nesta revisão; a cobertura factual real ainda
+precisa ser medida novamente. A suíte completa revelou também uma asserção global
+no teste zero-shot: outros testes já haviam importado Qdrant. A verificação agora
+compara os módulos antes e depois da execução zero-shot, sem depender da ordem.

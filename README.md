@@ -7,7 +7,7 @@ Assistente inteligente para universitários em multijornada (faculdade, trabalho
 - **Linguagem & Runtime:** Python 3.11
 - **Backend & APIs:** FastAPI
 - **Banco Vetorial & MLOps:** Qdrant (Docker) & MLflow
-- **Processamento Multimodal:** Sentence-Transformers (`all-MiniLM-L6-v2`), Whisper local (`tiny`) e Tesseract OCR (`--psm 6`)
+- **Processamento Multimodal:** Sentence-Transformers (`paraphrase-multilingual-MiniLM-L12-v2`), Whisper local (`tiny`) e Tesseract OCR (`--psm 6`)
 - **Qualidade & Testes:** Pytest & Ruff
 
 ---
@@ -49,6 +49,31 @@ Assistente inteligente para universitários em multijornada (faculdade, trabalho
    cd Challenge-2---Assistente-de-rotina-universitaria-
    git checkout develop
    ```
+
+2. **Crie e ative o ambiente virtual:**
+
+   ```bash
+   python3.11 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+   No Windows (PowerShell), use `py -3.11 -m venv .venv` e
+   `.\.venv\Scripts\Activate.ps1`.
+
+3. **Instale as dependências:**
+
+   ```bash
+   python -m pip install -r requirements.txt
+   ```
+
+4. **Suba o Qdrant pelo Docker Compose:**
+
+   ```bash
+   docker compose -f infra/docker-compose.yml up -d qdrant
+   ```
+
+   Qdrant fica disponível em `http://localhost:6333`. Para iniciar também
+   o MLflow, execute `docker compose -f infra/docker-compose.yml up -d`.
 
 ### Benchmark zero-shot (Cenário 1)
 

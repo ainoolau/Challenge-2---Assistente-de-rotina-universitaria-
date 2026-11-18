@@ -6,9 +6,21 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 from pydantic import BaseModel
+
+
+def load_api_key(path: Path) -> None:
+    """Carrega apenas GROQ_API_KEY, preservando o valor já definido no ambiente."""
+    if os.environ.get("GROQ_API_KEY"):
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        key, separator, value = line.strip().partition("=")
+        if separator and key == "GROQ_API_KEY":
+            os.environ[key] = value.strip().strip("\"'")
+            return
 
 
 class StructuredLLM(Protocol):

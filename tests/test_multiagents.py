@@ -430,3 +430,62 @@ def test_groq_failed_structured_output_keeps_known_usage(monkeypatch, finish, co
 def test_run_id_cannot_escape_output_directory():
     with pytest.raises(ValidationError):
         AgentRequest(question="Pergunta documental?", run_id="../../outside")
+
+
+def test_agents_env_loader_preserves_environment_and_loads_only_key(
+    tmp_path, monkeypatch
+):
+    from src.agents.llm import load_api_key
+
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.delenv("UNRELATED_SETTING", raising=False)
+    env = tmp_path / ".env"
+    env.write_text("# config\nUNRELATED_SETTING=ignored\nGROQ_API_KEY='test-key'\n")
+    load_api_key(env)
+    import os
+
+    assert os.environ["GROQ_API_KEY"] == "test-key"
+    assert "UNRELATED_SETTING" not in os.environ
+    monkeypatch.setenv("GROQ_API_KEY", "existing-key")
+    load_api_key(tmp_path / "missing.env")
+    assert os.environ["GROQ_API_KEY"] == "existing-key"
+
+
+@pytest.mark.parametrize(
+    "kind,expected", [("simple", 3), ("compound", 5), ("refinement", 5)]
+)
+def test_research_chunk_budget_preserves_lower_score_evidence(kind, expected):
+    from src.agents.schemas import EvidenceChunk
+
+    class BudgetRetriever:
+        def retrieve(self, question):
+            start = (
+                3 if question.startswith("o que") or question == "Complemento" else 0
+            )
+            return [
+                EvidenceChunk(
+                    source_id=f"C{i}",
+                    source="rules.txt",
+                    chunk_index=i,
+                    text=f"Regra {i}",
+                    score=0.8 - i * 0.03,
+                )
+                for i in range(start, start + 3)
+            ]
+
+    class BudgetLLM(SimulatedLLM):
+        def complete(self, role, instructions, data, output):
+            return ResearchNotes(
+                facts=[],
+                gaps=["Falta regra"],
+                additional_queries=["Complemento"] if kind == "refinement" else [],
+            )
+
+    question = (
+        "Qual a frequência e o que ocorre depois?" if kind == "compound" else "Regra?"
+    )
+    result = ResearchAgent(BudgetRetriever(), BudgetLLM()).execute(question)
+    assert len(result.chunks) == expected
+    assert len({c.source_id for c in result.chunks}) == expected
+    if expected == 5:
+        assert any(c.chunk_index >= 3 for c in result.chunks)

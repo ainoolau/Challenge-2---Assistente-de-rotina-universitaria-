@@ -12,10 +12,9 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from pydantic import ValidationError  # noqa: E402
 
-from scripts.scenarios.zero_shot import load_api_key  # noqa: E402
 from src.agents.analysis_planning_agent import AnalysisPlanningAgent  # noqa: E402
 from src.agents.demo import QUESTIONS, SimulatedLLM, SimulatedRetriever, demo_request  # noqa: E402
-from src.agents.llm import GroqLLM, LLMConfig  # noqa: E402
+from src.agents.llm import GroqLLM, LLMConfig, load_api_key  # noqa: E402
 from src.agents.orchestrator import MultiAgentOrchestrator  # noqa: E402
 from src.agents.research_agent import QdrantRetriever, ResearchAgent  # noqa: E402
 from src.agents.schemas import AgentRequest  # noqa: E402

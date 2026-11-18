@@ -20,6 +20,7 @@ def config():
 
 
 def test_only_question_is_sent(tmp_path, config):
+    modules_before = set(sys.modules)
     source = tmp_path / "queries.json"
     source.write_text(
         json.dumps(
@@ -63,7 +64,8 @@ def test_only_question_is_sent(tmp_path, config):
     assert rows[0]["retrieval_latency_ms"] is None
     assert rows[0]["abstained"] is False
     assert not any(
-        name.startswith(("qdrant_client", "data_pipeline")) for name in sys.modules
+        name.startswith(("qdrant_client", "data_pipeline"))
+        for name in set(sys.modules) - modules_before
     )
 
 

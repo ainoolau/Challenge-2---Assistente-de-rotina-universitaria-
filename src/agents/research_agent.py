@@ -99,7 +99,7 @@ class ResearchAgent:
             if key not in seen:
                 chosen.append(chunk)
                 seen.add(key)
-            if len(chosen) == 3:
+            if len(chosen) == (5 if len(queries) > 1 else 3):
                 break
         chunks = [
             chunk.model_copy(update={"source_id": f"C{i}"})
@@ -169,7 +169,7 @@ class ResearchAgent:
                 if key not in seen:
                     chosen.append(chunk)
                     seen.add(key)
-                if len(chosen) == 3:
+                if len(chosen) == (5 if len(queries) > 1 else 3):
                     break
             chunks = [
                 chunk.model_copy(update={"source_id": f"C{i}"})

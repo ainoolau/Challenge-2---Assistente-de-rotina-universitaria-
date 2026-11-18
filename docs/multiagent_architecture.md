@@ -55,8 +55,9 @@ inesperados. Não modifica o schema do benchmark da Sprint 3.
 
 - AgentRequest: run_id, question, timezone IANA, schedule_slots, study_goals,
   horizon e horários de sono (padrão 22h–06h).
-- RetrievalResult: consultas realizadas, rounds de pesquisa, top_score, até três
-  chunks finais, citações, fatos extraídos, lacunas e decisão de abstenção.
+- RetrievalResult: consultas realizadas, rounds de pesquisa, top_score, chunks finais (até três
+  em busca simples ou cinco em busca composta/refinamento), citações, fatos
+  extraídos, lacunas e decisão de abstenção.
 - ProposalDraft: afirmações com source_ids, texto renderizado, limitações e plano.
 - PlanningProposal: blocos sugeridos, minutos não alocados, resumo e
   requires_confirmation=true.
@@ -75,7 +76,8 @@ da citação não basta: o validador LLM compara o significado com o trecho orig
 Perguntas com duas orações interrogativas podem gerar três buscas iniciais
 (pergunta inteira e duas partes). A extração pode solicitar até duas buscas curtas
 adicionais em uma única rodada. Cada consulta usa o mesmo retrieval Top-3; a união
-é deduplicada e limitada a três chunks finais, preservando cobertura entre buscas.
+é deduplicada e limitada a cinco chunks finais quando há mais de uma query,
+preservando cobertura entre buscas. Buscas simples mantêm o limite de três.
 Esse mecanismo muda o perfil de retrieval em relação ao benchmark da Sprint 3:
 não comparar métricas diretamente sem controlar essa diferença.
 
