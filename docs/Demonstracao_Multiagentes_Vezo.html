@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vezo — Demonstração Interativa do Sistema Multiagentes</title>
+  <style>
+    :root {
+      --cereja: #A71942;
+      --vinho: #650F2C;
+      --coral: #FF7A6B;
+      --creme: #FAF7F4;
+      --rose: #F8D7DE;
+      --grafite: #211B20;
+      --muted: #5A4F57;
+      --border: #E8CFD5;
+      --white: #FFFFFF;
+      --ok-bg: #ECFDF5;
+      --ok-fg: #15803D;
+      --ok-bd: #86EFAC;
+      --warn-bg: #FFFBEB;
+      --warn-fg: #B45309;
+      --warn-bd: #FCD34D;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--creme);
+      color: var(--grafite);
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--cereja);
+      color: var(--white);
+      border-bottom: 5px solid var(--vinho);
+      padding: 20px 28px;
+    }
+
+    .header-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand h1 {
+      font-family: "Montserrat", "Segoe UI", sans-serif;
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+    }
+
+    .brand p {
+      font-size: 0.85rem;
+      color: var(--rose);
+      margin-top: 2px;
+    }
+
+    .run-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 6px;
+      background: rgba(101, 15, 44, 0.45);
+      border: 1px solid rgba(248, 215, 222, 0.35);
+      color: var(--white);
+    }
+
+    .pill.live {
+      background: var(--ok-bg);
+      color: var(--ok-fg);
+      border-color: var(--ok-bd);
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 22px auto 40px;
+      padding: 0 20px;
+    }
+
+    .stepper-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+    }
+
+    .steps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .step-btn {
+      font-family: "Montserrat", "Segoe UI", sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--creme);
+      color: var(--vinho);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .step-btn:hover {
+      border-color: var(--cereja);
+      background: var(--rose);
+    }
+
+    .step-btn.active {
+      background: var(--cereja);
+      color: var(--white);
+      border-color: var(--vinho);
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .ctrl-btn {
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 7px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--vinho);
+      background: var(--white);
+      color: var(--vinho);
+      cursor: pointer;
+    }
+
+    .ctrl-btn:hover { background: var(--rose); }
+    .ctrl-btn.playing { background: var(--vinho); color: var(--white); }
+
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px 24px;
+      box-shadow: 0 2px 10px rgba(33, 27, 32, 0.04);
+      display: none;
+    }
+
+    .card.active { display: block; }
+
+    .card-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      border-bottom: 2px solid var(--rose);
+      padding-bottom: 10px;
+      margin-bottom: 16px;
+    }
+
+    .card-header h2 {
+      font-family: "Montserrat", "Segoe UI", sans-serif;
+      font-size: 1.18rem;
+      color: var(--cereja);
+    }
+
+    .contract-tag {
+      font-family: "Consolas", monospace;
+      font-size: 0.8rem;
+      background: var(--creme);
+      color: var(--vinho);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .quote-box {
+      background: var(--creme);
+      border-left: 4px solid var(--cereja);
+      padding: 12px 16px;
+      border-radius: 0 6px 6px 0;
+      margin: 12px 0 16px;
+      font-size: 1rem;
+    }
+
+    .quote-box strong { color: var(--vinho); }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
+      margin: 14px 0 18px;
+    }
+
+    .kpi {
+      background: var(--creme);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+
+    .kpi .label {
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .kpi .val {
+      font-family: "Montserrat", "Segoe UI", sans-serif;
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--vinho);
+      margin-top: 3px;
+    }
+
+    .kpi .sub {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 16px;
+      font-size: 0.9rem;
+    }
+
+    th {
+      background: var(--cereja);
+      color: var(--white);
+      font-family: "Montserrat", "Segoe UI", sans-serif;
+      font-size: 0.8rem;
+      text-align: left;
+      padding: 9px 11px;
+    }
+
+    td {
+      padding: 8px 11px;
+      border-bottom: 1px solid var(--rose);
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td { background: var(--creme); }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .badge-ok { background: var(--ok-bg); color: var(--ok-fg); border: 1px solid var(--ok-bd); }
+    .badge-warn { background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-bd); }
+    .badge-vezo { background: var(--rose); color: var(--vinho); border: 1px solid var(--border); }
+
+    .mono {
+      font-family: "Consolas", monospace;
+      font-size: 0.84rem;
+      background: var(--creme);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--cereja);
+      padding: 12px 14px;
+      border-radius: 0 6px 6px 0;
+      white-space: pre-wrap;
+      margin: 12px 0;
+    }
+
+    .handoff-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 14px 0;
+    }
+
+    @media (max-width: 760px) {
+      .handoff-grid { grid-template-columns: 1fr; }
+    }
+
+    .handoff-box {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      background: var(--creme);
+    }
+
+    .handoff-box h3 {
+      font-family: "Montserrat", "Segoe UI", sans-serif;
+      font-size: 0.92rem;
+      margin-bottom: 8px;
+      color: var(--vinho);
+    }
+
+    footer {
+      max-width: 1120px;
+      margin: 18px auto 0;
+      padding: 0 20px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <h1>PROJETO VEZO — SISTEMA MULTIAGENTES</h1>
+        <p>Demonstração interativa de execução real (cenário Planejamento • Groq + Qdrant)</p>
+      </div>
+      <div class="run-meta">
+        <span class="pill live">LIVE • COMPLETED</span>
+        <span class="pill">run_id: multiagent-5904f5e9d90145c88757812827f79e71</span>
+        <span class="pill">openai/gpt-oss-20b • 6 chamadas</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="stepper-bar">
+      <div class="steps" id="stepButtons">
+        <button class="step-btn active" data-step="0">1. Entrada &amp; Agenda</button>
+        <button class="step-btn" data-step="1">2. Pesquisa (Qdrant)</button>
+        <button class="step-btn" data-step="2">3. Análise &amp; Motor Python</button>
+        <button class="step-btn" data-step="3">4. Validação &amp; Correção (6 chamadas)</button>
+        <button class="step-btn" data-step="4">5. Resposta Final</button>
+      </div>
+      <div class="controls">
+        <button class="ctrl-btn" id="prevBtn">← Anterior</button>
+        <button class="ctrl-btn" id="nextBtn">Próximo →</button>
+        <button class="ctrl-btn" id="autoBtn">▶ Auto-play</button>
+      </div>
+    </div>
+
+    <!-- ETAPA 1 -->
+    <section class="card active" data-panel="0">
+      <div class="card-header">
+        <h2>Etapa 1 — Entrada Estruturada &amp; Agenda Protegida</h2>
+        <span class="contract-tag">AgentRequest (Pydantic v2 • extra="forbid")</span>
+      </div>
+      <div class="quote-box">
+        <strong>Pergunta do estudante:</strong>
+        “Tenho prova de Econometria na próxima semana. Quando é a aula e como encaixar estudos sem mexer no meu sono?”
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="label">Meta de Estudo</div>
+          <div class="val">240 minutos</div>
+          <div class="sub">Estudo de Econometria (prazo 20/11 às 20h)</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Sono Protegido</div>
+          <div class="val">22:00 – 06:00</div>
+          <div class="sub">Regra determinística recorrente (America/Sao_Paulo)</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Horizonte</div>
+          <div class="val">17/11 a 20/11</div>
+          <div class="sub">Datas absolutas com fuso IANA explícito</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Política de Escrita</div>
+          <div class="val">Somente Proposta</div>
+          <div class="sub">agenda_persisted: false • requires_confirmation: true</div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Data</th><th>Horário</th><th>Tipo</th><th>Compromisso Informado</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>17/11/2026</td><td>06:30 – 07:30</td><td>commute</td><td>Deslocamento fictício</td><td><span class="badge badge-vezo">Fixo protegido</span></td></tr>
+          <tr><td>17/11/2026</td><td>08:00 – 18:00</td><td>work</td><td>CLT fictício</td><td><span class="badge badge-vezo">Fixo protegido</span></td></tr>
+          <tr><td>17/11/2026</td><td>08:00 – 09:50</td><td>class</td><td>Aula de Econometria informada</td><td><span class="badge badge-warn">Conflito pré-existente com CLT</span></td></tr>
+          <tr><td>19/11/2026</td><td>08:00 – 18:00</td><td>work</td><td>CLT fictício</td><td><span class="badge badge-vezo">Fixo protegido</span></td></tr>
+          <tr><td>19/11/2026</td><td>08:00 – 09:50</td><td>class</td><td>Aula de Econometria informada</td><td><span class="badge badge-warn">Conflito pré-existente com CLT</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ETAPA 2 -->
+    <section class="card" data-panel="1">
+      <div class="card-header">
+        <h2>Etapa 2 — Agente de Pesquisa (Qdrant + Gate Pré-LLM + Refinamento)</h2>
+        <span class="contract-tag">RetrievalResult</span>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="label">Gate Pré-LLM</div>
+          <div class="val">0,5898 ≥ 0,50</div>
+          <div class="sub"><span class="badge badge-ok">LIBERADO</span> (abstained: false)</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Rodadas &amp; Queries</div>
+          <div class="val">2 rodadas • 4 queries</div>
+          <div class="sub">Decomposição composta + 1 refinamento</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Orçamento Final</div>
+          <div class="val">5 chunks</div>
+          <div class="sub">MiniLM multilíngue 384d COSINE</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Evidência Verificada</div>
+          <div class="val">[C3] chunk #11</div>
+          <div class="sub">perfis_rotina_forms.txt (score 0,5700)</div>
+        </div>
+      </div>
+      <div class="quote-box">
+        <strong>Citação literal verificada em código:</strong>
+        “Ter/Qui com Econometria das 08h às 09h50” — <code>[C3: perfis_rotina_forms.txt]</code>
+      </div>
+      <div class="quote-box" style="border-left-color: #B45309;">
+        <strong>Lacuna documental registrada (gap):</strong>
+        “Como encaixar estudos sem mexer no sono” — não existe estratégia pessoal na base; o cálculo de horários é delegado ao motor determinístico Python (<code>planning.py</code>).
+      </div>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Documento</th><th>Chunk</th><th>Modalidade</th><th>Score</th><th>Papel na Síntese</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>C1</td><td>audio_rotina_04.wav</td><td>#1</td><td>audio</td><td>0,5898</td><td>Contexto recuperado (outro perfil)</td></tr>
+          <tr><td>C2</td><td>audio_rotina_01.ogg</td><td>#0</td><td>audio</td><td>0,5834</td><td>Contexto recuperado (outro perfil)</td></tr>
+          <tr><td><strong>C3</strong></td><td><strong>perfis_rotina_forms.txt</strong></td><td><strong>#11</strong></td><td><strong>texto</strong></td><td><strong>0,5700</strong></td><td><span class="badge badge-ok">Citação literal verificada</span></td></tr>
+          <tr><td>C4</td><td>audio_rotina_04.wav</td><td>#2</td><td>audio</td><td>0,4819</td><td>Contexto recuperado</td></tr>
+          <tr><td>C5</td><td>grade_aluno_06.jpg</td><td>#3</td><td>ocr</td><td>0,4698</td><td>Contexto recuperado</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ETAPA 3 -->
+    <section class="card" data-panel="2">
+      <div class="card-header">
+        <h2>Etapa 3 — Análise, Planejamento &amp; Motor Determinístico (planning.py)</h2>
+        <span class="contract-tag">ProposalDraft + PlanningProposal</span>
+      </div>
+      <div class="quote-box">
+        <strong>Síntese documental citada:</strong>
+        A aula de Econometria ocorre nas terças e quintas-feiras das 08h às 09h50. <code>[C3: perfis_rotina_forms.txt]</code>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="label">Blocos Calculados</div>
+          <div class="val">5 blocos</div>
+          <div class="sub">Granularidade máxima de 60 min/bloco</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Tempo Alocado</div>
+          <div class="val">240 / 240 min</div>
+          <div class="sub">unallocated: [] (0 min pendentes)</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Invariantes de Agenda</div>
+          <div class="val">100% preservadas</div>
+          <div class="sub">Sono 22h–06h e fixos intactos</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Conflitos Pré-Existentes</div>
+          <div class="val">2 sinalizados</div>
+          <div class="sub">CLT vs. Aula em 17/11 e 19/11 (não movidos)</div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Data</th><th>Início</th><th>Fim</th><th>Duração</th><th>Verificação Determinística</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>17/11/2026</td><td>06:00</td><td>06:30</td><td>30 min</td><td><span class="badge badge-ok">Após sono (06h) e antes do deslocamento (06h30)</span></td></tr>
+          <tr><td>2</td><td>17/11/2026</td><td>07:30</td><td>08:00</td><td>30 min</td><td><span class="badge badge-ok">Após deslocamento (07h30) e antes da aula/CLT (08h)</span></td></tr>
+          <tr><td>3</td><td>17/11/2026</td><td>18:00</td><td>19:00</td><td>60 min</td><td><span class="badge badge-ok">Janela livre pós-CLT, fora do sono</span></td></tr>
+          <tr><td>4</td><td>17/11/2026</td><td>19:00</td><td>20:00</td><td>60 min</td><td><span class="badge badge-ok">Janela livre pós-CLT, fora do sono</span></td></tr>
+          <tr><td>5</td><td>17/11/2026</td><td>20:00</td><td>21:00</td><td>60 min</td><td><span class="badge badge-ok">Encerra 1h antes da janela de sono (22h)</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ETAPA 4 -->
+    <section class="card" data-panel="3">
+      <div class="card-header">
+        <h2>Etapa 4 — Agente de Validação &amp; Ciclo Real de Correção (6 Chamadas)</h2>
+        <span class="contract-tag">ValidationResult (attempt 0 → attempt 1)</span>
+      </div>
+      <div class="handoff-grid">
+        <div class="handoff-box">
+          <h3>Tentativa 0 — Reprovação &amp; Devolução à Análise</h3>
+          <p><span class="badge badge-warn">valid = false</span> &nbsp; <code>factual_ok=true</code> • <code>invariants_ok=true</code></p>
+          <p style="margin-top:8px;font-size:0.88rem;">
+            <strong>Parecer enviado à Análise:</strong> “Remover as referências a conflitos com CLT fictício, pois não há dados que sustentem tais conflitos.”
+          </p>
+          <p style="margin-top:6px;font-size:0.82rem;color:var(--muted);">
+            O orquestrador encaminhou a correção para a Análise (tentativa 1), enquanto o motor determinístico manteve os alertas de conflito de entrada protegidos em código.
+          </p>
+        </div>
+        <div class="handoff-box" style="background:#ECFDF5;border-color:#86EFAC;">
+          <h3 style="color:#15803D;">Tentativa 1 — Aprovação Final</h3>
+          <p><span class="badge badge-ok">valid = true</span> &nbsp; <code>factual_ok=true</code> • <code>invariants_ok=true</code></p>
+          <p style="margin-top:8px;font-size:0.88rem;">
+            <strong>Violações:</strong> <code>[]</code> &nbsp;|&nbsp; <strong>Correções pendentes:</strong> <code>[]</code>
+          </p>
+          <p style="margin-top:6px;font-size:0.82rem;color:#166534;">
+            Citações literais, invariantes do motor <code>planning.py</code> e auditoria semântica integralmente aprovadas dentro do limite de 1 rodada de correção (6 chamadas totais).
+          </p>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Papel / Etapa</th><th>Tokens Entrada</th><th>Tokens Saída</th><th>HTTP Real</th><th>Espera Cota</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>Research (rodada 0)</td><td>1.431</td><td>151</td><td>0,75 s</td><td>0,00 s</td><td><span class="badge badge-ok">OK</span></td></tr>
+          <tr><td>2</td><td>Research (refinamento)</td><td>1.458</td><td>149</td><td>0,70 s</td><td>12,19 s</td><td><span class="badge badge-ok">OK</span></td></tr>
+          <tr><td>3</td><td>Analysis (tentativa 0)</td><td>1.474</td><td>105</td><td>0,57 s</td><td>14,31 s</td><td><span class="badge badge-ok">OK</span></td></tr>
+          <tr><td>4</td><td>Validation (tentativa 0)</td><td>1.860</td><td>486</td><td>1,03 s</td><td>14,41 s</td><td><span class="badge badge-warn">REPROVOU</span></td></tr>
+          <tr><td>5</td><td>Analysis (correção t1)</td><td>1.497</td><td>131</td><td>0,90 s</td><td>13,97 s</td><td><span class="badge badge-ok">OK</span></td></tr>
+          <tr><td>6</td><td>Validation (aprovação t1)</td><td>1.859</td><td>126</td><td>0,72 s</td><td>14,09 s</td><td><span class="badge badge-ok">APROVOU</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ETAPA 5 -->
+    <section class="card" data-panel="4">
+      <div class="card-header">
+        <h2>Etapa 5 — Resposta Final Entregue ao Estudante &amp; Métricas</h2>
+        <span class="contract-tag">AgentRunResult • status="completed"</span>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="label">Chamadas LLM</div>
+          <div class="val">6 reais</div>
+          <div class="sub">Limite arquitetural respeitado (máx. 6)</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Consumo de Tokens</div>
+          <div class="val">9.579 / 1.148</div>
+          <div class="sub">Entrada / Saída (total: 10.727)</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Latência HTTP Real</div>
+          <div class="val">4,67 s</div>
+          <div class="sub">Soma das 6 requisições à API Groq</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Tempo Total (com pacing)</div>
+          <div class="val">82,01 s</div>
+          <div class="sub">68,97 s de espera preventiva por cota</div>
+        </div>
+      </div>
+      <div class="mono">A aula de Econometria ocorre nas terças e quintas-feiras das 08h às 09h50. [C3: perfis_rotina_forms.txt]
+
+Limitações: Não há informação sobre como encaixar estudos sem mexer no sono.; Como encaixar estudos sem mexer no sono; Compromissos fixos sobrepostos: CLT fictício / Aula de Econometria informada (conflita com CLT) (2026-11-17T08:00:00-03:00); Compromissos fixos sobrepostos: CLT fictício / Aula de Econometria informada (conflita com CLT) (2026-11-19T08:00:00-03:00); Agenda fictícia/informada; sugestão depende de confirmação e não foi aplicada.
+
+Proposta de estudo (não aplicada; requer confirmação):
+- Estudo de Econometria: 2026-11-17T06:00:00-03:00 a 2026-11-17T06:30:00-03:00
+- Estudo de Econometria: 2026-11-17T07:30:00-03:00 a 2026-11-17T08:00:00-03:00
+- Estudo de Econometria: 2026-11-17T18:00:00-03:00 a 2026-11-17T19:00:00-03:00
+- Estudo de Econometria: 2026-11-17T19:00:00-03:00 a 2026-11-17T20:00:00-03:00
+- Estudo de Econometria: 2026-11-17T20:00:00-03:00 a 2026-11-17T21:00:00-03:00
+5 blocos sugeridos; 0 objetivos com tempo pendente. Nenhuma agenda foi alterada.</div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Projeto Vezo (2026) — Residência em IA • Second Challenge • Offline (sem rede ou credenciais)</span>
+    <span>Atalhos: ← / → para navegar entre etapas</span>
+  </footer>
+
+  <script>
+    const buttons = Array.from(document.querySelectorAll(".step-btn"));
+    const panels = Array.from(document.querySelectorAll(".card"));
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const autoBtn = document.getElementById("autoBtn");
+    let current = 0;
+    let timer = null;
+
+    function show(index) {
+      current = (index + panels.length) % panels.length;
+      buttons.forEach((b, i) => b.classList.toggle("active", i === current));
+      panels.forEach((p, i) => p.classList.toggle("active", i === current));
+    }
+
+    buttons.forEach((btn) => btn.addEventListener("click", () => show(Number(btn.dataset.step))));
+    prevBtn.addEventListener("click", () => show(current - 1));
+    nextBtn.addEventListener("click", () => show(current + 1));
+
+    autoBtn.addEventListener("click", () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+        autoBtn.classList.remove("playing");
+        autoBtn.textContent = "▶ Auto-play";
+      } else {
+        autoBtn.classList.add("playing");
+        autoBtn.textContent = "⏸ Pausar";
+        timer = setInterval(() => show(current + 1), 3500);
+      }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") show(current + 1);
+      if (e.key === "ArrowLeft") show(current - 1);
+    });
+  </script>
+</body>
+</html>
