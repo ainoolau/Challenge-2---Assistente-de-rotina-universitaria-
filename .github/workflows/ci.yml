@@ -5,11 +5,30 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  lint-and-types:
-    name: Lint & Type Checking
+  # =========================================================================
+  # 1. BACKEND MATRIX + GATE
+  # =========================================================================
+  backend-matrix:
+    name: "Backend / ${{ matrix.check }}"
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - ruff-lint
+          - ruff-format
+          - mypy
+          - unit-tests
     steps:
       - name: Checkout repositório
         uses: actions/checkout@v4
@@ -20,30 +39,167 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Instalar ferramentas de qualidade
+      - name: Executar ${{ matrix.check }}
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
-          pip install ruff mypy
 
-      - name: Executar Ruff (Linter e Formatação)
-        run: |
-          ruff check .
-          ruff format --check .
+          case "${{ matrix.check }}" in
+            ruff-lint)
+              pip install ruff
+              ruff check .
+              echo "### Backend — Ruff Lint" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Status: **PASS** (\`ruff check .\`)" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            ruff-format)
+              pip install ruff
+              ruff format --check .
+              echo "### Backend — Ruff Format" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Status: **PASS** (\`ruff format --check .\`)" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            mypy)
+              pip install mypy "pydantic>=2.6.0"
+              mypy src --ignore-missing-imports --no-warn-return-any
+              echo "### Backend — MyPy (src/)" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Status: **PASS** (\`mypy src --ignore-missing-imports --no-warn-return-any\`)" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            unit-tests)
+              pip install pytest pytest-mock pytest-asyncio jsonschema "pydantic>=2.6.0"
+              TESTS="tests/test_smoke.py tests/test_multiagents.py"
+              API_NOTE="Pendente (tests/test_api.py ainda não criado)"
+              if [ -f "tests/test_api.py" ]; then
+                pip install "fastapi>=0.110.0" "httpx>=0.27.0"
+                TESTS="$TESTS tests/test_api.py"
+                API_NOTE="Ativo e validado (tests/test_api.py)"
+              fi
+              pytest $TESTS -v
+              echo "### Backend — Unit Tests" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Suíte executada: \`$TESTS\`" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Camada FastAPI: $API_NOTE" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+          esac
 
-      - name: Checagem Estática de Tipos (MyPy)
-        run: |
-          mypy src --ignore-missing-imports --no-warn-return-any
-
-  guardrails:
-    name: Bloqueio de Binários e LGPD
+  backend-approved:
+    name: Backend Approved
     runs-on: ubuntu-latest
+    needs: [ backend-matrix ]
+    if: always()
+    steps:
+      - name: Avaliar gate Backend
+        shell: bash
+        run: |
+          echo "### Gate: Backend Approved" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Resultado da matriz: \`${{ needs.backend-matrix.result }}\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.backend-matrix.result }}" != "success" ]; then
+            echo "::error::Backend matrix falhou (${{ needs.backend-matrix.result }})."
+            exit 1
+          fi
+
+  # =========================================================================
+  # 2. MLOPS / RAG MATRIX + GATE
+  # =========================================================================
+  mlops-matrix:
+    name: "MLOps / ${{ matrix.check }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - golden-set-contract
+          - zero-shot-isolation
+          - guardrail-contract
+          - rag-mlops-readiness
     steps:
       - name: Checkout repositório
         uses: actions/checkout@v4
 
-      - name: Verificar se há pesos de modelos, mídias ou arquivos pesados
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Executar ${{ matrix.check }}
+        shell: bash
         run: |
-          python - << 'EOF'
+          set -euo pipefail
+          python -m pip install --upgrade pip
+
+          case "${{ matrix.check }}" in
+            golden-set-contract)
+              pip install pytest jsonschema
+              pytest tests/test_benchmark_golden_set.py -v
+              echo "### MLOps — Golden Set & Schema Contract" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Status: **PASS** (Golden Set v1.0.0 e JSON Schema Draft 2020-12)" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            zero-shot-isolation)
+              pip install pytest jsonschema
+              pytest tests/test_zero_shot.py -v
+              echo "### MLOps — Zero-Shot Isolation" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Status: **PASS** (isolamento de RAG/gabarito validado)" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            guardrail-contract)
+              pip install pytest jsonschema
+              pytest tests/test_guardrail_rag.py -v
+              echo "### MLOps — Guardrail RAG Contract" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Status: **PASS** (contrato e bloqueio pré-LLM validados)" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            rag-mlops-readiness)
+              pip install pytest qdrant-client
+              pytest tests/test_retrieval.py -v
+              MLOPS_NOTE="Pendente (auto-ativa assim que tests/test_mlops.py for criado)"
+              if [ -f "tests/test_mlops.py" ]; then
+                pytest tests/test_mlops.py -v
+                MLOPS_NOTE="Ativo e validado (tests/test_mlops.py)"
+              fi
+              echo "### MLOps — RAG & Observability Readiness" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Retrieval em memória (\`tests/test_retrieval.py\`): **PASS**" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Observabilidade MLflow (\`src/mlops/\`): $MLOPS_NOTE" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+          esac
+
+  mlops-approved:
+    name: MLOps Approved
+    runs-on: ubuntu-latest
+    needs: [ mlops-matrix ]
+    if: always()
+    steps:
+      - name: Avaliar gate MLOps
+        shell: bash
+        run: |
+          echo "### Gate: MLOps Approved" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Resultado da matriz: \`${{ needs.mlops-matrix.result }}\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.mlops-matrix.result }}" != "success" ]; then
+            echo "::error::MLOps matrix falhou (${{ needs.mlops-matrix.result }})."
+            exit 1
+          fi
+
+  # =========================================================================
+  # 3. INFRA & LGPD MATRIX + GATE
+  # =========================================================================
+  infra-matrix:
+    name: "Infra / ${{ matrix.check }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - lgpd-binary-guardrails
+          - docker-compose-config
+    steps:
+      - name: Checkout repositório
+        uses: actions/checkout@v4
+
+      - name: Executar ${{ matrix.check }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ matrix.check }}" = "lgpd-binary-guardrails" ]; then
+            python3 - << 'EOF'
+          import os
+          import subprocess
           import sys
           from pathlib import Path
 
@@ -55,45 +211,186 @@ jobs:
           )
           limite_mb = 10.0
           violacoes = []
+          total_files = 0
 
           for path in Path(".").rglob("*"):
               partes = [p.lower() for p in path.parts]
-              if ".git" in partes or ".venv" in partes or "node_modules" in partes:
+              if any(x in partes for x in (".git", ".venv", "node_modules", ".next")):
                   continue
-              
+
               if path.is_file():
+                  total_files += 1
                   nome = path.name.lower()
                   tamanho_mb = path.stat().st_size / (1024 * 1024)
                   caminho_posix = path.as_posix().lower()
 
-                  # 1. Pesos de modelos são estritamente proibidos em qualquer lugar
                   if any(nome.endswith(ext) for ext in EXTENSOES_PESOS_MODELOS):
                       violacoes.append(f"Peso de modelo detectado: {path}")
                       continue
 
-                  # 2. Arquivos de mídia/PDF em data/samples são amostras controladas permitidas
                   if caminho_posix.startswith("data/samples/"):
                       continue
 
-                  # 3. Fora de data/samples, extensões de mídia/LGPD são barradas
                   if any(nome.endswith(ext) for ext in EXTENSOES_MIDIA_LGPD):
-                      violacoes.append(f"Extensão bloqueada fora de data/samples (LGPD/Mídia): {path}")
+                      violacoes.append(
+                          f"Extensão bloqueada fora de data/samples (LGPD/Mídia): {path}"
+                      )
                   elif tamanho_mb > limite_mb:
-                      violacoes.append(f"Arquivo excede limite seguro ({limite_mb}MB): {path} ({tamanho_mb:.2f}MB)")
+                      violacoes.append(
+                          f"Arquivo excede limite seguro ({limite_mb}MB): {path} ({tamanho_mb:.2f}MB)"
+                      )
+
+          tracked = subprocess.run(
+              ["git", "ls-files"], text=True, capture_output=True, check=False
+          )
+          if tracked.returncode == 0:
+              for line in tracked.stdout.splitlines():
+                  p = line.strip().lower()
+                  if p == ".env" or (p.startswith(".env.") and p != ".env.example"):
+                      violacoes.append(f"Arquivo de segredos versionado: {line}")
+                  if p.startswith("reports/multiagents/"):
+                      violacoes.append(f"Trace privado versionado: {line}")
+                  if p.startswith("data/qdrant/") or p.endswith(".db"):
+                      violacoes.append(f"Banco local versionado: {line}")
+
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write("### Infra — Guardrails LGPD, Binários e Segredos\n")
+                  fh.write(f"- Arquivos inspecionados: **{total_files}**\n")
+                  fh.write(f"- Violações encontradas: **{len(violacoes)}**\n")
 
           if violacoes:
-              print(" Falha na validação de guardrails:")
+              print("Falha na validação de guardrails:")
               for v in violacoes:
                   print(f"  - {v}")
               sys.exit(1)
 
-          print(" Repositório limpo: guardrails aprovados.")
+          print("Repositório limpo: guardrails aprovados.")
           EOF
+          else
+            docker compose -f infra/docker-compose.yml config --quiet
+            SERVICES=$(docker compose -f infra/docker-compose.yml config --services | tr '\n' ' ')
+            echo "### Infra — Docker Compose Config" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Arquivo: \`infra/docker-compose.yml\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Serviços validados: \`${SERVICES}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Status: **PASS**" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-  unit-tests:
-    name: Testes Automatizados (Leves)
+  infra-approved:
+    name: Infra Approved
     runs-on: ubuntu-latest
-    needs: [lint-and-types, guardrails]
+    needs: [ infra-matrix ]
+    if: always()
+    steps:
+      - name: Avaliar gate Infra
+        shell: bash
+        run: |
+          echo "### Gate: Infra Approved" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Resultado da matriz: \`${{ needs.infra-matrix.result }}\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.infra-matrix.result }}" != "success" ]; then
+            echo "::error::Infra matrix falhou (${{ needs.infra-matrix.result }})."
+            exit 1
+          fi
+
+  # =========================================================================
+  # 4. FRONTEND PWA MATRIX + GATE (AUTO-ATIVÁVEL)
+  # =========================================================================
+  frontend-matrix:
+    name: "Frontend / ${{ matrix.check }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - lint
+          - typecheck
+          - build
+    steps:
+      - name: Checkout repositório
+        uses: actions/checkout@v4
+
+      - name: Verificar presença do PWA (frontend/package.json)
+        id: detect
+        shell: bash
+        run: |
+          if [ -f "frontend/package.json" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "### Frontend — ${{ matrix.check }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Status: **SKIPPED (auto-ativável)** — \`frontend/package.json\` ainda não foi inicializado." >> "$GITHUB_STEP_SUMMARY"
+            echo "- Assim que o PWA Next.js/React for criado em \`frontend/\`, este check torna-se bloqueante automaticamente." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Configurar Node 20
+        if: steps.detect.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar dependências e executar ${{ matrix.check }}
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -f "pnpm-lock.yaml" ]; then
+            corepack enable
+            pnpm install --frozen-lockfile
+            RUNNER="pnpm run"
+          elif [ -f "package-lock.json" ]; then
+            npm ci
+            RUNNER="npm run"
+          else
+            npm install
+            RUNNER="npm run"
+          fi
+
+          case "${{ matrix.check }}" in
+            lint)
+              $RUNNER lint
+              ;;
+            typecheck)
+              npx tsc --noEmit
+              ;;
+            build)
+              $RUNNER build
+              ;;
+          esac
+
+          echo "### Frontend — ${{ matrix.check }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Status: **PASS** (Next.js/React PWA validado em \`frontend/\`)" >> "$GITHUB_STEP_SUMMARY"
+
+  frontend-approved:
+    name: Frontend Approved
+    runs-on: ubuntu-latest
+    needs: [ frontend-matrix ]
+    if: always()
+    steps:
+      - name: Avaliar gate Frontend
+        shell: bash
+        run: |
+          echo "### Gate: Frontend Approved" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Resultado da matriz: \`${{ needs.frontend-matrix.result }}\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.frontend-matrix.result }}" != "success" ]; then
+            echo "::error::Frontend matrix falhou (${{ needs.frontend-matrix.result }})."
+            exit 1
+          fi
+
+  # =========================================================================
+  # 5. RUNTIME MATRIX + GATE
+  # =========================================================================
+  runtime-matrix:
+    name: "Runtime / ${{ matrix.check }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - py311-contract
+          - multiagents-cli-smoke
     steps:
       - name: Checkout repositório
         uses: actions/checkout@v4
@@ -104,21 +401,135 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Instalar dependências leves de teste
+      - name: Executar ${{ matrix.check }}
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
-          pip install pytest pytest-mock pytest-asyncio jsonschema "pydantic>=2.6.0"
+          pip install "pydantic>=2.6.0"
 
-      - name: Executar Testes Unitários de Smoke
+          if [ "${{ matrix.check }}" = "py311-contract" ]; then
+            PYTHONPATH=. python - << 'EOF'
+          import os
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          assert sys.version_info[:2] == (3, 11), f"Esperado Python 3.11, obtido {sys.version}"
+          pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          req_py = pyproject["project"]["requires-python"]
+          assert "3.11" in req_py, f"requires-python inesperado: {req_py}"
+
+          import src.agents.orchestrator  # noqa: F401
+          import src.agents.planning  # noqa: F401
+          import src.agents.schemas  # noqa: F401
+
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write("### Runtime — Contrato Python 3.11\n")
+                  fh.write(f"- Versão ativa: `{sys.version.split()[0]}`\n")
+                  fh.write(f"- `requires-python`: `{req_py}`\n")
+                  fh.write("- Imports núcleo `src/agents/*`: **PASS**\n")
+          EOF
+          else
+            OUT_DIR="/tmp/vezo-ci-multiagents"
+            rm -rf "$OUT_DIR"
+            python scripts/demo_multiagents.py --mode simulated --scenario all --output-dir "$OUT_DIR"
+            PYTHONPATH=. python - << 'EOF'
+          import os
+          from pathlib import Path
+          from src.agents.schemas import AgentRunResult
+
+          out_dir = Path("/tmp/vezo-ci-multiagents")
+          traces = sorted(out_dir.rglob("*.json"))
+          assert len(traces) == 4, f"Esperados 4 traces simulados, encontrados {len(traces)}"
+          statuses = {}
+          for path in traces:
+              result = AgentRunResult.model_validate_json(path.read_text(encoding="utf-8"))
+              statuses[path.stem] = result.status
+          assert statuses == {
+              "correcao": "completed",
+              "documental": "completed",
+              "fora_dominio": "abstained",
+              "planejamento": "completed",
+          }, f"Estados inesperados: {statuses}"
+
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write("### Runtime — Multiagents CLI Smoke (Simulado)\n")
+                  fh.write("| Cenário | Status |\n| --- | --- |\n")
+                  for k, v in statuses.items():
+                      fh.write(f"| `{k}` | `{v}` |\n")
+          EOF
+          fi
+
+  runtime-approved:
+    name: Runtime Approved
+    runs-on: ubuntu-latest
+    needs: [ runtime-matrix ]
+    if: always()
+    steps:
+      - name: Avaliar gate Runtime
+        shell: bash
         run: |
-          pytest tests/test_smoke.py
+          echo "### Gate: Runtime Approved" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Resultado da matriz: \`${{ needs.runtime-matrix.result }}\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.runtime-matrix.result }}" != "success" ]; then
+            echo "::error::Runtime matrix falhou (${{ needs.runtime-matrix.result }})."
+            exit 1
+          fi
 
-      - name: Validar Golden Set e Contrato do Benchmark (TASK-S3-01)
+  # =========================================================================
+  # 6. GATE FINAL CONSOLIDADO (Required Check para develop / main)
+  # =========================================================================
+  ci-verde:
+    name: ci-verde
+    runs-on: ubuntu-latest
+    needs:
+      - backend-approved
+      - mlops-approved
+      - infra-approved
+      - frontend-approved
+      - runtime-approved
+    if: always()
+    steps:
+      - name: Consolidar resultado final e gerar resumo
+        shell: bash
         run: |
-          pytest tests/test_benchmark_golden_set.py -v
+          B="${{ needs.backend-approved.result }}"
+          M="${{ needs.mlops-approved.result }}"
+          I="${{ needs.infra-approved.result }}"
+          F="${{ needs.frontend-approved.result }}"
+          R="${{ needs.runtime-approved.result }}"
 
-      - name: Validar executor zero-shot (TASK-S3-02)
-        run: pytest tests/test_zero_shot.py -v
+          icon() {
+            case "$1" in
+              success) echo "PASS" ;;
+              skipped) echo "SKIP" ;;
+              *) echo "FAIL ($1)" ;;
+            esac
+          }
 
-      - name: Validar colaboração multiagente e agenda
-        run: pytest tests/test_multiagents.py -v
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          ## Vezo CI — Resumo Consolidado (\`ci-verde\`)
+
+          - **Branch / Ref:** \`${{ github.ref_name }}\`
+          - **Commit:** \`${{ github.sha }}\`
+
+          | Trilha / Gate | Resultado |
+          | :--- | :--- |
+          | **Backend Approved** | $(icon "$B") |
+          | **MLOps Approved** | $(icon "$M") |
+          | **Infra Approved** | $(icon "$I") |
+          | **Frontend Approved** | $(icon "$F") |
+          | **Runtime Approved** | $(icon "$R") |
+          EOF
+
+          if [ "$B" != "success" ] || [ "$M" != "success" ] || [ "$I" != "success" ] || [ "$F" != "success" ] || [ "$R" != "success" ]; then
+            echo "::error::Um ou mais Gate Jobs falharam (Backend=$B, MLOps=$M, Infra=$I, Frontend=$F, Runtime=$R)."
+            exit 1
+          fi
+
+          echo "Todos os Gate Jobs foram aprovados — ci-verde!"
