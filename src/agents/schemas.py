@@ -1,48 +1,54 @@
 """Contratos independentes do benchmark da Sprint 3."""
 
-from datetime import datetime, time
+from datetime import time
 from typing import Any, Literal
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
+from src.core.schemas import (
+    Contract,
+    Interval,
+    MovedBlock,
+    PlanningProposal,
+    PlanningRequest,
+    ProposedBlock,
+    RebalanceProposal,
+    RebalanceRequest,
+    ScheduleDiff,
+    ScheduleSlot,
+    StudyGoal,
+    Unallocated,
+)
 
-class Contract(BaseModel):
-    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
-
-
-class Interval(Contract):
-    start: datetime
-    end: datetime
-
-    @model_validator(mode="after")
-    def ordered(self):
-        if self.start.utcoffset() is None or self.end.utcoffset() is None:
-            raise ValueError("Datas precisam de fuso explícito")
-        if self.end.timestamp() <= self.start.timestamp():
-            raise ValueError("Intervalo deve ter duração positiva")
-        return self
-
-
-class ScheduleSlot(Interval):
-    label: str = Field(min_length=1, max_length=200)
-    kind: Literal["sleep", "work", "class", "commute", "other"] = "other"
-
-
-class StudyGoal(Contract):
-    goal_id: str = Field(min_length=1, max_length=100)
-    title: str = Field(min_length=1, max_length=200)
-    duration_minutes: int = Field(gt=0, le=10080)
-    deadline: datetime
-    priority: int = Field(default=1, ge=1, le=5)
-
-    @field_validator("deadline")
-    @classmethod
-    def aware(cls, value):
-        if value.utcoffset() is None:
-            raise ValueError("Prazo precisa de fuso explícito")
-        return value
+__all__ = [
+    "AgentRequest",
+    "AgentRunResult",
+    "AnalysisNotes",
+    "Claim",
+    "Contract",
+    "EvidenceChunk",
+    "EvidenceFact",
+    "Interval",
+    "MovedBlock",
+    "PlanningProposal",
+    "PlanningRequest",
+    "ProposalDraft",
+    "ProposedBlock",
+    "RebalanceProposal",
+    "RebalanceRequest",
+    "ResearchNotes",
+    "RetrievalResult",
+    "RunMetrics",
+    "ScheduleDiff",
+    "ScheduleSlot",
+    "StudyGoal",
+    "TraceEvent",
+    "Unallocated",
+    "ValidationNotes",
+    "ValidationResult",
+]
 
 
 class AgentRequest(Contract):
@@ -57,6 +63,9 @@ class AgentRequest(Contract):
     horizon: Interval | None = None
     sleep_start: time = time(22)
     sleep_end: time = time(6)
+    buffer_minutes: int = Field(default=0, ge=0, le=120)
+    max_block_minutes: int = Field(default=60, ge=15, le=240)
+    min_block_minutes: int = Field(default=1, ge=1, le=60)
 
     @field_validator("timezone")
     @classmethod
@@ -81,6 +90,8 @@ class AgentRequest(Contract):
             raise ValueError("Horários de sono devem ser diferentes")
         if any(t.tzinfo is not None for t in (self.sleep_start, self.sleep_end)):
             raise ValueError("Horários de sono usam o fuso do pedido")
+        if self.min_block_minutes > self.max_block_minutes:
+            raise ValueError("min_block_minutes não pode exceder max_block_minutes")
         ids = [g.goal_id for g in self.study_goals]
         if len(set(ids)) != len(ids):
             raise ValueError("IDs dos objetivos devem ser únicos")
@@ -130,23 +141,6 @@ class Claim(Contract):
 class AnalysisNotes(Contract):
     claims: list[Claim] = Field(max_length=20)
     limitations: list[str] = Field(max_length=10)
-
-
-class ProposedBlock(Interval):
-    goal_id: str
-    title: str
-
-
-class Unallocated(Contract):
-    goal_id: str
-    remaining_minutes: int = Field(gt=0)
-
-
-class PlanningProposal(Contract):
-    proposed_blocks: list[ProposedBlock] = Field(default_factory=list)
-    unallocated: list[Unallocated] = Field(default_factory=list)
-    diff_summary: str
-    requires_confirmation: Literal[True] = True
 
 
 class ProposalDraft(Contract):
