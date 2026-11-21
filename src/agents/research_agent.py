@@ -56,6 +56,8 @@ class QdrantRetriever:
                 score=hit.score,
                 chunk_index=hit.chunk_index,
                 task_type=hit.task_type,
+                title=hit.title,
+                page_or_time=hit.page_or_time,
             )
             for i, hit in enumerate(hits, 1)
             if hit.text.strip()

@@ -94,6 +94,8 @@ class EvidenceChunk(Contract):
     text: str = Field(min_length=1, max_length=20000)
     score: float = Field(ge=-1, le=1)
     task_type: str | None = None
+    title: str | None = None
+    page_or_time: str | None = None
 
 
 class EvidenceFact(Contract):

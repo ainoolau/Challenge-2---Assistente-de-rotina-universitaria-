@@ -102,3 +102,16 @@ Não foi feita nova chamada à Groq nesta revisão; a cobertura factual real ain
 precisa ser medida novamente. A suíte completa revelou também uma asserção global
 no teste zero-shot: outros testes já haviam importado Qdrant. A verificação agora
 compara os módulos antes e depois da execução zero-shot, sem depender da ordem.
+
+## Validação ao vivo com orçamento de 5 chunks (21/11/2026)
+
+Executado o cenário `documental` ao vivo contra Qdrant Docker (`QDRANT_URL=http://localhost:6333`, coleção `rotina_estudante_multimodal`) e Groq (`openai/gpt-oss-20b`, `--min-call-interval 15`), utilizando o orçamento ampliado de 5 chunks em `src/agents/research_agent.py`:
+
+- **Trace local (ignorado pelo Git):** `reports/multiagents/live/multiagent-9f49125cbf7c4df39840b70e87d5f96f/documental.json`
+- **Estado:** `completed` (`4` chamadas LLM — 1 rodada de refinamento + análise + validação)
+- **Top score:** `0.6798` (`edital_residencia_02.pdf[c27]`)
+- **Chunks finais (5):** `C1` (`edital_residencia_02.pdf[c27]`, `0.6798`), `C2` (`edital_residencia_02.pdf[c16]`, `0.5820`), `C3` (`perfis_rotina_forms.txt[c3]`, `0.5716`), `C4` (`edital_residencia_02.pdf[c21]`, `0.5692`), `C5` (`edital_residencia_02.pdf[c33]`, `0.5194`)
+- **Cobertura factual verificada:** ambas as partes da pergunta composta foram recuperadas e verificadas literalmente (`gaps: []`):
+  - Frequência mínima presencial de **90%** (`[C4: edital_residencia_02.pdf]`)
+  - Desligamento após acumular **3 (três) advertências** (`[C1: edital_residencia_02.pdf]`)
+- **Métricas:** `52305.43 ms` totais (incluindo pacing de 15s), `5899` tokens de entrada e `526` tokens de saída.

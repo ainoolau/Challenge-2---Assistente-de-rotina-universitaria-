@@ -48,9 +48,15 @@ def carregar_modelo_whisper():
     return whisper.load_model("tiny")
 
 
-def transcrever_audio(caminho_audio: str) -> str:
-    """Transcreve arquivos OGG, MP3 e WAV em português."""
+def _formatar_tempo(segundos: float) -> str:
+    """Formata segundos em MM:SS para metadados de localização de áudio."""
+    total = max(0, int(segundos))
+    minutos, resto = divmod(total, 60)
+    return f"{minutos:02d}:{resto:02d}"
 
+
+def transcrever_audio_com_tempos(caminho_audio: str) -> list[tuple[str, str]]:
+    """Transcreve áudio preservando faixas de tempo (MM:SS-MM:SS) por segmento."""
     caminho = Path(caminho_audio)
 
     if not caminho.is_file():
@@ -62,27 +68,46 @@ def transcrever_audio(caminho_audio: str) -> str:
         raise ValueError(f"Formato não suportado: {caminho.suffix}")
 
     modelo = carregar_modelo_whisper()
-
     resultado = modelo.transcribe(str(caminho), language="pt", fp16=False)
 
-    return resultado["text"].strip()
+    segmentos = resultado.get("segments") or []
+    saida: list[tuple[str, str]] = []
+    for seg in segmentos:
+        texto = str(seg.get("text", "")).strip()
+        if not texto:
+            continue
+        inicio = _formatar_tempo(float(seg.get("start", 0.0)))
+        fim = _formatar_tempo(float(seg.get("end", 0.0)))
+        saida.append((f"{inicio}-{fim}", texto))
+
+    if saida:
+        return saida
+
+    texto_completo = str(resultado.get("text", "")).strip()
+    return [("00:00", texto_completo)] if texto_completo else []
+
+
+def transcrever_audio(caminho_audio: str) -> str:
+    """Transcreve arquivos OGG, MP3 e WAV em português."""
+    segmentos = transcrever_audio_com_tempos(caminho_audio)
+    return " ".join(texto for _, texto in segmentos).strip()
 
 
 # EXTRAÇÃO DE TEXTO DE PDF
 
 
-def extrair_texto_pdf(caminho_pdf: str) -> str:
-    """Extrai texto de PDFs digitais ou digitalizados."""
+def extrair_paginas_pdf(caminho_pdf: str) -> list[tuple[str, str]]:
+    """Extrai texto de PDFs digitais ou digitalizados preservando o número da página."""
 
     caminho = Path(caminho_pdf)
 
     if not caminho.is_file():
         raise FileNotFoundError(f"PDF não encontrado: {caminho}")
 
-    textos = []
+    paginas: list[tuple[str, str]] = []
 
     with pymupdf.open(caminho) as documento:
-        for _numero, pagina in enumerate(documento, start=1):
+        for numero, pagina in enumerate(documento, start=1):
             texto = pagina.get_text("text").strip()
 
             # Se não há texto digital, usamos OCR na página.
@@ -96,9 +121,14 @@ def extrair_texto_pdf(caminho_pdf: str) -> str:
                 ).strip()
 
             if texto:
-                textos.append(texto)
+                paginas.append((f"p. {numero}", texto))
 
-    return "\n\n".join(textos)
+    return paginas
+
+
+def extrair_texto_pdf(caminho_pdf: str) -> str:
+    """Extrai texto de PDFs digitais ou digitalizados."""
+    return "\n\n".join(texto for _, texto in extrair_paginas_pdf(caminho_pdf))
 
 
 # EXTRAÇÃO DE TEXTO DE WORD
