@@ -211,7 +211,10 @@ def test_cli_four_simulated_scenarios(tmp_path):
     assert main(["--output-dir", str(tmp_path)]) == 0
     reports = list(tmp_path.rglob("*.json"))
     assert len(reports) == 4
-    results = [AgentRunResult.model_validate_json(p.read_text()) for p in reports]
+    results = [
+        AgentRunResult.model_validate_json(p.read_text(encoding="utf-8"))
+        for p in reports
+    ]
     assert all(r.mode == "simulated" for r in results)
     assert any(r.validation and r.validation.attempt == 1 for r in results)
 
@@ -489,3 +492,185 @@ def test_research_chunk_budget_preserves_lower_score_evidence(kind, expected):
     assert len({c.source_id for c in result.chunks}) == expected
     if expected == 5:
         assert any(c.chunk_index >= 3 for c in result.chunks)
+
+
+def test_anti_hallucination_low_score_abstains_without_llm():
+    from src.agents.schemas import EvidenceChunk
+
+    class LowScoreRetriever:
+        def retrieve(self, question):
+            return [
+                EvidenceChunk(
+                    source_id="C1",
+                    source="edital_residencia_02.pdf",
+                    chunk_index=0,
+                    text="Trecho pouco relacionado à consulta.",
+                    score=0.499,
+                )
+            ]
+
+    result = runner(retriever=LowScoreRetriever()).run(demo_request("documental"))
+    assert result.status == "abstained"
+    assert result.retrieval.abstained is True
+    assert result.metrics.llm_calls == 0
+    assert result.proposal is None
+    assert result.final_answer == ABSTENTION
+
+
+def test_anti_hallucination_high_score_without_evidence_or_valid_quote_abstains():
+    from src.agents.schemas import EvidenceChunk
+
+    class HighScoreUnrelatedRetriever:
+        def retrieve(self, question):
+            return [
+                EvidenceChunk(
+                    source_id="C1",
+                    source="calendario_academico_01.pdf",
+                    chunk_index=0,
+                    text="Feriado nacional em 15 de novembro.",
+                    score=0.92,
+                )
+            ]
+
+    class FabricatingResearchLLM(SimulatedLLM):
+        def complete(self, role, instructions, data, output):
+            if role == "research":
+                return ResearchNotes(
+                    facts=[
+                        EvidenceFact(
+                            statement="A nota mínima é 7,0.",
+                            source_id="C1",
+                            quote="Nota mínima exigida de 7,0 pontos.",
+                        )
+                    ],
+                    gaps=["Regra não consta no trecho."],
+                )
+            return super().complete(role, instructions, data, output)
+
+    result = runner(
+        llm=FabricatingResearchLLM(), retriever=HighScoreUnrelatedRetriever()
+    ).run(demo_request("correcao"))
+    assert result.status == "abstained"
+    assert result.retrieval.abstained is True
+    assert result.retrieval.verified_facts == []
+    assert result.proposal is None
+    assert result.final_answer == ABSTENTION
+
+
+def test_anti_hallucination_persistent_invalid_citation_abstains_without_leaking():
+    from src.agents.schemas import AnalysisNotes, Claim
+
+    class AlwaysInvalidCitationLLM(SimulatedLLM):
+        def complete(self, role, instructions, data, output):
+            if role == "analysis":
+                return AnalysisNotes(
+                    claims=[
+                        Claim(
+                            text="Afirmação com referência inventada.",
+                            source_ids=["C999"],
+                        )
+                    ],
+                    limitations=[],
+                )
+            return super().complete(role, instructions, data, output)
+
+    llm = AlwaysInvalidCitationLLM()
+    result = runner(llm=llm).run(demo_request("correcao"))
+    assert result.status == "abstained"
+    assert result.validation is not None
+    assert result.validation.valid is False
+    assert "Citação inexistente" in result.validation.violations
+    assert result.final_answer == ABSTENTION
+    assert "C999" not in result.final_answer
+    # Validação estrutural reprova em código sem chamar o LLM de validação.
+    assert not any(call["role"] == "validation" for call in llm.calls)
+
+
+def test_anti_hallucination_divergent_answer_rejected_deterministically():
+    from src.agents.schemas import ProposalDraft
+
+    request = demo_request("correcao")
+    retrieval = ResearchAgent(SimulatedRetriever(), SimulatedLLM()).execute(
+        request.question
+    )
+    proposal = AnalysisPlanningAgent(SimulatedLLM()).execute(request, retrieval)
+    tampered = ProposalDraft(
+        claims=proposal.claims,
+        limitations=proposal.limitations,
+        answer="Texto alterado manualmente fora das afirmações auditáveis [C1: fixture_simulada.txt]",
+        planning=proposal.planning,
+    )
+    llm = SimulatedLLM()
+    verdict = ValidationAgent(llm).execute(request, retrieval, tampered)
+    assert verdict.valid is False
+    assert "Resposta diverge das afirmações auditáveis" in verdict.violations
+    assert llm.calls == []
+
+
+def test_anti_hallucination_conflicting_sources_keep_only_existing_refs_and_gaps():
+    from src.agents.schemas import AnalysisNotes, Claim, EvidenceChunk
+
+    class ConflictingRetriever:
+        def retrieve(self, question):
+            return [
+                EvidenceChunk(
+                    source_id="C1",
+                    source="calendario_iesb.pdf",
+                    chunk_index=0,
+                    text="Término do semestre em 12/12/2026.",
+                    score=0.81,
+                ),
+                EvidenceChunk(
+                    source_id="C2",
+                    source="calendario_unb.pdf",
+                    chunk_index=0,
+                    text="Fim das aulas em 14/12/2026.",
+                    score=0.79,
+                ),
+            ]
+
+    class ConflictAwareLLM(SimulatedLLM):
+        def complete(self, role, instructions, data, output):
+            if role == "research":
+                return ResearchNotes(
+                    facts=[
+                        EvidenceFact(
+                            statement="No calendário IESB, o término é 12/12/2026.",
+                            source_id="C1",
+                            quote="Término do semestre em 12/12/2026.",
+                        ),
+                        EvidenceFact(
+                            statement="No calendário UnB, o fim das aulas é 14/12/2026.",
+                            source_id="C2",
+                            quote="Fim das aulas em 14/12/2026.",
+                        ),
+                    ],
+                    gaps=[
+                        "Fontes de instituições distintas informam datas diferentes."
+                    ],
+                )
+            if role == "analysis":
+                return AnalysisNotes(
+                    claims=[
+                        Claim(
+                            text="O calendário IESB indica término em 12/12/2026.",
+                            source_ids=["C1"],
+                        ),
+                        Claim(
+                            text="O calendário UnB indica fim das aulas em 14/12/2026.",
+                            source_ids=["C2"],
+                        ),
+                    ],
+                    limitations=[],
+                )
+            return super().complete(role, instructions, data, output)
+
+    result = runner(llm=ConflictAwareLLM(), retriever=ConflictingRetriever()).run(
+        AgentRequest(question="Quando termina o semestre acadêmico?")
+    )
+    assert result.status == "completed"
+    existing_ids = {c.source_id for c in result.retrieval.chunks}
+    for claim in result.proposal.claims:
+        assert set(claim.source_ids) <= existing_ids
+    assert any("datas diferentes" in lim for lim in result.proposal.limitations)
+    assert "Limitações:" in result.final_answer

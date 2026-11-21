@@ -53,7 +53,12 @@ def main(argv=None):
     try:
         if args.request:
             requests = [
-                ("custom", AgentRequest.model_validate_json(args.request.read_text()))
+                (
+                    "custom",
+                    AgentRequest.model_validate_json(
+                        args.request.read_text(encoding="utf-8")
+                    ),
+                )
             ]
         else:
             requests = [
@@ -118,7 +123,9 @@ def main(argv=None):
             result = runner.run(request)
             destination = args.output_dir / mode / request.run_id / f"{name}.json"
             destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_text(result.model_dump_json(indent=2) + "\n")
+            destination.write_text(
+                result.model_dump_json(indent=2) + "\n", encoding="utf-8"
+            )
             results.append(result)
             print(
                 f"{name}: {mode}, {result.status}, {result.metrics.llm_calls} chamadas; {destination}"

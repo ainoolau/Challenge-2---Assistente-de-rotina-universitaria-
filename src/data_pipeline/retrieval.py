@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 if TYPE_CHECKING:
     from qdrant_client import QdrantClient
@@ -31,7 +31,7 @@ DEFAULT_LOCAL_PATH = Path(os.getenv("QDRANT_PATH", PROJECT_ROOT / "data" / "qdra
 
 
 class Embedder(Protocol):
-    def encode(self, sentences, **kwargs): ...
+    def encode(self, sentences: Any, /, **kwargs: Any) -> Any: ...
 
 
 @dataclass(frozen=True)
@@ -41,6 +41,11 @@ class SearchHit:
     text: str
     task_type: str | None
     chunk_index: int | None
+    source_id: str | None = None
+    title: str | None = None
+    page_or_time: str | None = None
+    corpus_scope: str | None = None
+    ingestion_version: str | None = None
 
 
 def _normalize(text: str) -> str:
@@ -90,7 +95,7 @@ def get_client(local_path: Path | str | None = None) -> QdrantClient:
 def load_embedder(model_name: str = EMBEDDING_MODEL) -> Embedder:
     from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer(model_name, device="cpu")
+    return cast(Embedder, SentenceTransformer(model_name, device="cpu"))
 
 
 def search(
@@ -124,6 +129,11 @@ def search(
                 text=str(payload.get("text", "")),
                 task_type=payload.get("task_type"),
                 chunk_index=payload.get("chunk_index"),
+                source_id=payload.get("source_id"),
+                title=payload.get("title"),
+                page_or_time=payload.get("page_or_time"),
+                corpus_scope=payload.get("corpus_scope"),
+                ingestion_version=payload.get("ingestion_version"),
             )
         )
     return hits
