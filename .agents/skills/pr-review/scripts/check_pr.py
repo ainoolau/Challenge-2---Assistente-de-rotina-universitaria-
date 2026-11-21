@@ -33,6 +33,7 @@ LIGHT_TEST_SUITE = [
     "tests/test_zero_shot.py",
     "tests/test_planning_core.py",
     "tests/test_multiagents.py",
+    "tests/test_api.py",
 ]
 
 

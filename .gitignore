@@ -29,8 +29,12 @@ mlruns/
 mlartifacts/
 .mlflow/
 
-# Banco Qdrant local
+# Banco Qdrant local e bancos SQLite locais
 data/qdrant/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
 
 # Dados locais e uploads (mantendo data/samples versionado para a entrega)
 data/*
