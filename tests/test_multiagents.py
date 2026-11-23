@@ -261,7 +261,14 @@ def test_groq_payload_usage_and_secret_not_in_trace(monkeypatch):
     payload = json.loads(http.call_args.args[0].data)
     assert payload["tool_choice"] == "none"
     assert "tools" not in payload
-    assert payload["response_format"] == {"type": "json_object"}
+    assert payload["response_format"] == {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "result",
+            "schema": ValidationNotes.model_json_schema(),
+            "strict": False,
+        },
+    }
     assert llm.calls[0]["input_tokens"] == 20
     assert llm.calls[0]["output_tokens"] == 30
     assert "unit-test-secret" not in json.dumps(llm.calls)
