@@ -1,6 +1,4 @@
-﻿version: "3.8"
-
-networks:
+﻿networks:
   routine_network:
     name: routine_network
     driver: bridge
@@ -31,7 +29,7 @@ services:
     container_name: routine_mlflow
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     volumes:
       - mlflow_data:/mlflow
     networks:
@@ -52,8 +50,47 @@ services:
       retries: 3
       start_period: 10s
 
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: routine_api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    volumes:
+      - api_data:/data
+      - hf_cache:/app/.cache/huggingface
+    networks:
+      - routine_network
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-rotina_estudante_multimodal}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      VEZO_DB_PATH: /data/vezo.db
+      VEZO_CORS_ORIGINS: ${VEZO_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      VEZO_COOKIE_SECURE: ${VEZO_COOKIE_SECURE:-false}
+      VEZO_LLM_MIN_CALL_INTERVAL: ${VEZO_LLM_MIN_CALL_INTERVAL:-0}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
 volumes:
   qdrant_storage:
     name: routine_qdrant_storage
   mlflow_data:
     name: routine_mlflow_data
+  api_data:
+    name: routine_api_data
+  hf_cache:
+    name: routine_hf_cache
