@@ -65,8 +65,10 @@ class DefaultOrchestratorManager:
         self._retriever: Any = None
         self._orchestrator: MultiAgentOrchestrator | None = None
 
-    def get(self) -> MultiAgentOrchestrator:
-        if self._orchestrator is not None:
+    def get(
+        self, scope: str = "demo", user_id: str | None = None
+    ) -> MultiAgentOrchestrator:
+        if scope == "demo" and self._orchestrator is not None:
             return self._orchestrator
 
         env_path = Path(".env")
@@ -80,7 +82,10 @@ class DefaultOrchestratorManager:
             )
 
         try:
-            retriever = QdrantRetriever()
+            retriever = QdrantRetriever(
+                collection="vezo_user_private" if scope == "private" else None,
+                user_id=user_id if scope == "private" else None,
+            )
         except Exception as exc:
             raise ServiceUnavailableError(
                 "Base vetorial Qdrant indisponível no momento. "
@@ -89,8 +94,7 @@ class DefaultOrchestratorManager:
 
         min_interval = float(os.getenv("VEZO_LLM_MIN_CALL_INTERVAL", "0"))
         llm = GroqLLM(LLMConfig(min_call_interval=min_interval))
-        self._retriever = retriever
-        self._orchestrator = MultiAgentOrchestrator(
+        orchestrator = MultiAgentOrchestrator(
             ResearchAgent(retriever, llm),
             AnalysisPlanningAgent(llm),
             ValidationAgent(llm),
@@ -98,7 +102,10 @@ class DefaultOrchestratorManager:
             mode="live",
             config={"source": "fastapi"},
         )
-        return self._orchestrator
+        if scope == "demo":
+            self._retriever = retriever
+            self._orchestrator = orchestrator
+        return orchestrator
 
     def close(self) -> None:
         if self._retriever is not None:

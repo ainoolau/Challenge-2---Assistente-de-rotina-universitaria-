@@ -312,7 +312,7 @@ def _criar_cliente_qdrant(qdrant_url: str | None = None) -> QdrantClient:
 
 
 def _buscar_pontos_existentes(
-    cliente: QdrantClient, collection_name: str, source_key: str
+    cliente: QdrantClient, collection_name: str, source_key: str, user_id: str
 ) -> list[Any]:
     from qdrant_client import models
 
@@ -323,7 +323,10 @@ def _buscar_pontos_existentes(
             models.FieldCondition(
                 key="source",
                 match=models.MatchValue(value=source_key),
-            )
+            ),
+            models.FieldCondition(
+                key="user_id", match=models.MatchValue(value=user_id)
+            ),
         ]
     )
     while True:
@@ -485,12 +488,16 @@ def ingest_files(
                     summary.errors.append(f"Nenhum chunk gerado: {arquivo.name}")
                     continue
 
-                source_key = normalize_source_key(arquivo)
+                source_key = (
+                    arquivo.name
+                    if corpus_scope == "private"
+                    else normalize_source_key(arquivo)
+                )
                 source_id = build_source_id(arquivo)
                 title = build_title(arquivo)
 
                 existentes = _buscar_pontos_existentes(
-                    cliente, collection_name, source_key
+                    cliente, collection_name, source_key, user_id
                 )
                 if (
                     len(existentes) == len(chunks)

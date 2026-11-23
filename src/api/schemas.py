@@ -201,6 +201,7 @@ class ProposalActionResponse(Contract):
 
 
 class ChatQueryRequest(Contract):
+    scope: Literal["private", "demo"] = "demo"
     question: str = Field(min_length=5, max_length=4000)
     horizon: Interval | None = None
     study_goals: list[StudyGoal] = Field(default_factory=list, max_length=50)

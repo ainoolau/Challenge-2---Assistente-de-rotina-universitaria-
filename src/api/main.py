@@ -3,13 +3,23 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any, cast
 
-from fastapi import FastAPI, HTTPException, Query, Request, Response, status
+from fastapi import (
+    FastAPI,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
@@ -716,6 +726,116 @@ def create_app(
     # 4. CHAT MULTIAGENTES & HISTÓRICO (TASK-F4-04 #68)
     # =========================================================================
 
+    @app.post("/documents/upload", tags=["documents"], status_code=201)
+    async def upload_document(
+        session: SessionDep, file: Annotated[UploadFile, File()]
+    ) -> dict[str, Any]:
+        from src.data_pipeline.ingestion import ingest_files
+        from src.data_pipeline.retrieval import get_client
+
+        filename = Path((file.filename or "").replace("\\", "/")).name
+        if not filename or Path(filename).suffix.lower() not in {
+            ".pdf",
+            ".txt",
+            ".docx",
+            ".png",
+            ".jpg",
+            ".jpeg",
+        }:
+            raise HTTPException(status_code=400, detail="Extensão de arquivo inválida.")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / filename
+            size = 0
+            with path.open("wb") as output:
+                while chunk := await file.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > 10 * 1024 * 1024:
+                        raise HTTPException(
+                            status_code=413, detail="Arquivo excede 10 MB."
+                        )
+                    output.write(chunk)
+            if not size:
+                raise HTTPException(status_code=400, detail="Arquivo vazio.")
+            try:
+                client = get_client()
+                try:
+                    summary = await run_in_threadpool(
+                        ingest_files,
+                        [path],
+                        collection_name="vezo_user_private",
+                        user_id=session.session_id,
+                        corpus_scope="private",
+                        target_collection_scope="private",
+                        client=client,
+                    )
+                finally:
+                    client.close()
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=503, detail="Serviço de ingestão indisponível."
+                ) from exc
+            if summary.failed_files or not (
+                summary.processed_files or summary.skipped_unchanged
+            ):
+                raise HTTPException(
+                    status_code=422, detail="Não foi possível extrair texto do arquivo."
+                )
+            return {
+                "filename": filename,
+                "chunks": summary.total_chunks_upserted,
+                "unchanged": bool(summary.skipped_unchanged),
+            }
+
+    @app.get("/documents", tags=["documents"])
+    def list_documents(session: SessionDep) -> list[dict[str, Any]]:
+        from qdrant_client import models
+
+        from src.data_pipeline.retrieval import get_client
+
+        try:
+            client = get_client()
+            try:
+                if not client.collection_exists("vezo_user_private"):
+                    return []
+                offset = None
+                documents: dict[str, dict[str, Any]] = {}
+                while True:
+                    points, offset = client.scroll(
+                        collection_name="vezo_user_private",
+                        scroll_filter=models.Filter(
+                            must=[
+                                models.FieldCondition(
+                                    key="user_id",
+                                    match=models.MatchValue(value=session.session_id),
+                                ),
+                                models.FieldCondition(
+                                    key="corpus_scope",
+                                    match=models.MatchValue(value="private"),
+                                ),
+                            ]
+                        ),
+                        limit=256,
+                        offset=offset,
+                        with_payload=True,
+                        with_vectors=False,
+                    )
+                    for point in points:
+                        payload = point.payload or {}
+                        source = str(payload.get("source", ""))
+                        documents[source] = {
+                            "filename": source,
+                            "created_at": payload.get("created_at"),
+                        }
+                    if offset is None:
+                        break
+                return list(documents.values())
+            finally:
+                client.close()
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503, detail="Base de documentos indisponível."
+            ) from exc
+
     @app.post("/chat/query", response_model=ChatQueryResponse, tags=["chat"])
     async def chat_query(
         request: Request,
@@ -753,8 +873,19 @@ def create_app(
 
         orch_provider: OrchestratorProvider = request.app.state.orchestrator_provider
         try:
-            orchestrator = await run_in_threadpool(orch_provider)
-            result = await run_in_threadpool(orchestrator.run, agent_req)
+            if orchestrator_provider is None:
+                orchestrator = await run_in_threadpool(
+                    default_manager.get, payload.scope, session.session_id
+                )
+            elif payload.scope == "demo":
+                orchestrator = await run_in_threadpool(orch_provider)
+            else:
+                raise ServiceUnavailableError("Provedor privado não configurado.")
+            try:
+                result = await run_in_threadpool(orchestrator.run, agent_req)
+            finally:
+                if orchestrator_provider is None and payload.scope == "private":
+                    orchestrator.research.retriever.close()
         except ServiceUnavailableError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

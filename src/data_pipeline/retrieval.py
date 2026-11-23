@@ -104,6 +104,7 @@ def search(
     query: str,
     top_k: int = 3,
     collection: str = DEFAULT_COLLECTION,
+    user_id: str | None = None,
 ) -> list[SearchHit]:
     """Busca os top_k trechos mais próximos da pergunta.
 
@@ -113,9 +114,26 @@ def search(
     vector = model.encode([query], normalize_embeddings=True, show_progress_bar=False)[
         0
     ]
+    from qdrant_client import models
+
+    query_filter = (
+        models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="user_id", match=models.MatchValue(value=user_id)
+                ),
+                models.FieldCondition(
+                    key="corpus_scope", match=models.MatchValue(value="private")
+                ),
+            ]
+        )
+        if user_id is not None
+        else None
+    )
     response = client.query_points(
         collection_name=collection,
         query=[float(x) for x in vector],
+        query_filter=query_filter,
         limit=top_k,
         with_payload=True,
     )

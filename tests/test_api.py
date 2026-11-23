@@ -499,3 +499,66 @@ def test_chat_query_documental_abstention_planning_and_unavailable(tmp_path: Pat
         )
         assert down.status_code == 503
         assert "indisponível" in down.json()["detail"].lower()
+
+
+def test_private_ingestion_isolates_same_filename(tmp_path):
+    import numpy as np
+    from qdrant_client import QdrantClient
+
+    from src.data_pipeline.ingestion import ingest_files
+    from src.data_pipeline.retrieval import search
+
+    class Embedder:
+        def encode(self, sentences, **kwargs):
+            return np.array([[1.0] + [0.0] * 383 for _ in sentences])
+
+    client = QdrantClient(":memory:")
+    model = Embedder()
+    document = tmp_path / "a.txt"
+    for session, content in [
+        ("A", "Documento secreto da primeira sessão."),
+        ("B", "Documento secreto da segunda sessão."),
+    ]:
+        document.write_text(content, encoding="utf-8")
+        summary = ingest_files(
+            [document],
+            collection_name="vezo_user_private",
+            user_id=session,
+            corpus_scope="private",
+            target_collection_scope="private",
+            client=client,
+            embedder=model,
+        )
+        assert summary.processed_files == 1
+    hits_a = search(
+        client, model, "documento", collection="vezo_user_private", user_id="A"
+    )
+    hits_b = search(
+        client, model, "documento", collection="vezo_user_private", user_id="B"
+    )
+    assert len(hits_a) == len(hits_b) == 1
+    assert "primeira" in hits_a[0].text
+    assert "segunda" in hits_b[0].text
+    client.close()
+
+
+def test_document_upload_rejects_invalid_and_oversized(api_client):
+    client, _ = api_client
+    _create_session(client)
+    assert (
+        client.post(
+            "/documents/upload", files={"file": ("bad.exe", b"data")}
+        ).status_code
+        == 400
+    )
+    assert (
+        client.post(
+            "/documents/upload",
+            files={"file": ("big.txt", b"x" * (10 * 1024 * 1024 + 1))},
+        ).status_code
+        == 413
+    )
+    assert (
+        client.post("/documents/upload", files={"file": ("empty.txt", b"")}).status_code
+        == 400
+    )
