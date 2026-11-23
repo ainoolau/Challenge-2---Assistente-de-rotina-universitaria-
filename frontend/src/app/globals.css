@@ -1,0 +1,79 @@
+/**
+ * Vezo PWA — Folha de Estilo Global (Pronta para consumo no TASK-F1-04 / #47)
+ *
+ * Ao inicializar Next.js + Tailwind CSS em `frontend/`:
+ * - Tailwind v4: descomentar `@import "tailwindcss";` e o bloco `@theme inline` abaixo.
+ * - Tailwind v3: adicionar `@tailwind base; @tailwind components; @tailwind utilities;`
+ *   e mapear as variáveis em `tailwind.config.ts`.
+ */
+
+/* @import "tailwindcss"; */
+@import "../styles/tokens.css";
+
+/*
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-slot-class: var(--slot-class);
+  --color-slot-work: var(--slot-work);
+  --color-slot-commute: var(--slot-commute);
+  --color-slot-sleep: var(--slot-sleep);
+  --color-slot-conflict: var(--slot-conflict);
+  --color-slot-study-proposed: var(--slot-study-proposed);
+  --color-slot-study-confirmed: var(--slot-study-confirmed);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+}
+*/
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  border-color: var(--border);
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: var(--background);
+  color: var(--foreground);
+  min-height: 100dvh;
+}
+
+/* Foco visível acessível (WCAG AA) em todos os controles interativos */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
