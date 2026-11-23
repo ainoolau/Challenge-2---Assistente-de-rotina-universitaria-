@@ -88,3 +88,25 @@ API_PROXY_TARGET=https://sua-api.exemplo.com
 ```
 
 `next.config.ts` cria o rewrite `/api/:path*` → `API_PROXY_TARGET` apenas quando a variável existe.
+
+## Testando no celular (mesma rede Wi-Fi)
+
+Para validar o layout mobile e o fluxo real da API direto no celular conectado ao mesmo Wi-Fi do computador:
+
+1. Descubra o IP local do PC (Windows: `ipconfig` → Endereço IPv4; Linux/macOS: `hostname -I`).
+2. Configure `frontend/.env.local` com o proxy same-origin e o IP liberado no dev server:
+
+```bash
+NEXT_PUBLIC_API_URL=/api
+API_PROXY_TARGET=http://127.0.0.1:8000
+ALLOWED_DEV_ORIGINS=192.168.0.100   # troque pelo IPv4 do seu PC
+```
+
+3. Suba a API na raiz (`uvicorn src.api.main:app --host 127.0.0.1 --port 8000`) e o frontend na rede local:
+
+```bash
+cd frontend
+npm run dev:lan                     # ou: npm run build && npm run start:lan
+```
+
+4. Acesse `http://<IP-DO-PC>:3000` no navegador do celular. O proxy `/api/*` mantém o cookie `HttpOnly` funcionando sem CORS nem necessidade de expor a porta `8000`. *(Obs.: o botão nativo de instalar PWA no celular exige HTTPS — em HTTP local você valida layout, toque, sessão e API; a instalação nativa é validada em `localhost` no desktop ou após o deploy HTTPS.)*
