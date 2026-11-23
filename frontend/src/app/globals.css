@@ -1,17 +1,32 @@
 /**
- * Vezo PWA — Folha de Estilo Global (Pronta para consumo no TASK-F1-04 / #47)
+ * Vezo PWA — Folha de Estilo Global (TASK-F1-04 / #47)
  *
- * Ao inicializar Next.js + Tailwind CSS em `frontend/`:
- * - Tailwind v4: descomentar `@import "tailwindcss";` e o bloco `@theme inline` abaixo.
- * - Tailwind v3: adicionar `@tailwind base; @tailwind components; @tailwind utilities;`
- *   e mapear as variáveis em `tailwind.config.ts`.
+ * Fonte única de verdade das cores: `../styles/tokens.css` (TASK-F1-03 / #46).
+ * Este arquivo apenas expõe esses tokens como utilitários Tailwind v4
+ * (`bg-primary`, `text-warning-subtle-foreground`, `border-slot-class`...).
+ * Nunca declare cores aqui nem nos componentes — altere somente `tokens.css`.
  */
 
-/* @import "tailwindcss"; */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 @import "../styles/tokens.css";
 
+/* O tema escuro é ativado pela classe `.dark` no <html> (mesma convenção de tokens.css). */
+@custom-variant dark (&:is(.dark *));
+
 /*
+ * `inline` faz os utilitários usarem diretamente `var(--token)`, garantindo que a troca
+ * Claro/Escuro em tokens.css se propague sem duplicar valores.
+ *
+ * Observação: `--font-sans`, `--font-mono` e `--radius-*` NÃO são redeclarados aqui
+ * com o mesmo nome para evitar autorreferência (`--x: var(--x)`); tokens.css já
+ * sobrescreve os padrões do Tailwind para fontes.
+ */
 @theme inline {
+  --font-heading: var(--font-sans);
+
+  /* Base shadcn/ui */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -29,51 +44,82 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  /* Estados semânticos */
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-destructive-subtle-foreground: var(--destructive-subtle-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-subtle-foreground: var(--warning-subtle-foreground);
+  --color-warning-accent: var(--warning-accent);
+  --color-warning-accent-foreground: var(--warning-accent-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-subtle-foreground: var(--success-subtle-foreground);
+
+  /* Domínio — Agenda Vezo (ScheduleSlot.kind / estado da proposta) */
   --color-slot-class: var(--slot-class);
+  --color-slot-class-bg: var(--slot-class-bg);
+  --color-slot-class-fg: var(--slot-class-fg);
   --color-slot-work: var(--slot-work);
+  --color-slot-work-bg: var(--slot-work-bg);
+  --color-slot-work-fg: var(--slot-work-fg);
   --color-slot-commute: var(--slot-commute);
+  --color-slot-commute-bg: var(--slot-commute-bg);
+  --color-slot-commute-fg: var(--slot-commute-fg);
   --color-slot-sleep: var(--slot-sleep);
+  --color-slot-sleep-bg: var(--slot-sleep-bg);
+  --color-slot-sleep-fg: var(--slot-sleep-fg);
   --color-slot-conflict: var(--slot-conflict);
+  --color-slot-conflict-bg: var(--slot-conflict-bg);
+  --color-slot-conflict-fg: var(--slot-conflict-fg);
   --color-slot-study-proposed: var(--slot-study-proposed);
+  --color-slot-study-proposed-bg: var(--slot-study-proposed-bg);
+  --color-slot-study-proposed-fg: var(--slot-study-proposed-fg);
   --color-slot-study-confirmed: var(--slot-study-confirmed);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-}
-*/
+  --color-slot-study-confirmed-bg: var(--slot-study-confirmed-bg);
+  --color-slot-study-confirmed-fg: var(--slot-study-confirmed-fg);
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  border-color: var(--border);
-}
-
-html {
-  font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: var(--leading-normal);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Raios derivados de --radius (10px): sm 6px · md 8px · lg 10px · xl 14px */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Layout duas colunas (DESIGN.md §4.1) usa o breakpoint padrão `lg:` = 64rem (1024px). */
 }
 
-body {
-  margin: 0;
-  background-color: var(--background);
-  color: var(--foreground);
-  min-height: 100dvh;
-}
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
 
-/* Foco visível acessível (WCAG AA) em todos os controles interativos */
-:where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+  html {
+    @apply font-sans;
+    line-height: var(--leading-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100dvh;
+  }
+
+  /* Foco visível acessível (WCAG AA) em todos os controles interativos */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Horários sempre em números tabulares (DESIGN.md §3.5) */
+  time {
+    font-variant-numeric: tabular-nums;
+  }
 }

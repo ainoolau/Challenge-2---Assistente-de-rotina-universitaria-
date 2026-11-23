@@ -28,8 +28,9 @@
   /* =========================================================================
    * 2. TIPOGRAFIA, ESPAÇAMENTO, RAIOS E ACESSIBILIDADE (MOBILE >= 360px / DESKTOP >= 1024px)
    * ========================================================================= */
-  --font-sans: "Inter", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  /* --font-inter / --font-jetbrains-mono são injetadas por next/font em app/layout.tsx */
+  --font-sans: var(--font-inter, "Inter"), "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-jetbrains-mono, "JetBrains Mono"), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* Escala tipográfica (rem — respeita preferências do usuário) */
   --text-xs: 0.75rem;      /* 12px — metadados, timestamps, badges compactos */
