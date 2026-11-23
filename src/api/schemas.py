@@ -26,6 +26,7 @@ class HealthResponse(Contract):
     version: str = "0.1.0"
     db_ok: bool = True
     qdrant_configured: bool = False
+    qdrant_ok: bool = False
     llm_configured: bool = False
 
 

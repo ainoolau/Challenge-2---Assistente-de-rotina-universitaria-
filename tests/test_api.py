@@ -52,6 +52,7 @@ def test_health_and_openapi_contract(api_client):
     data = health.json()
     assert data["status"] == "ok"
     assert data["db_ok"] is True
+    assert "qdrant_ok" in data
 
     spec = client.get("/openapi.json")
     assert spec.status_code == 200
@@ -70,6 +71,61 @@ def test_health_and_openapi_contract(api_client):
         "/chat/history",
     ):
         assert expected in paths
+
+
+def test_health_probes_qdrant_connectivity(api_client, monkeypatch):
+    import urllib.error
+    from contextlib import contextmanager
+
+    class FakeResp:
+        status = 200
+
+    seen_headers: list[dict[str, str]] = []
+
+    @contextmanager
+    def ok_urlopen(req, timeout=2.0):
+        assert req.full_url == "http://qdrant.internal:6333/collections"
+        seen_headers.append({k.lower(): v for k, v in req.header_items()})
+        yield FakeResp()
+
+    def unauthorized_urlopen(req, timeout=2.0):
+        raise urllib.error.HTTPError(
+            req.full_url, 401, "Unauthorized", hdrs=None, fp=None
+        )
+
+    def forbidden_urlopen(req, timeout=2.0):
+        raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", hdrs=None, fp=None)
+
+    def failing_urlopen(_req, timeout=2.0):
+        raise OSError("connection refused")
+
+    client, _ = api_client
+    monkeypatch.setenv("QDRANT_URL", "http://qdrant.internal:6333")
+    monkeypatch.setenv("QDRANT_API_KEY", "valid-test-key")
+
+    monkeypatch.setattr("src.api.main.urllib.request.urlopen", ok_urlopen)
+    ok_data = client.get("/health").json()
+    assert ok_data["qdrant_configured"] is True
+    assert ok_data["qdrant_ok"] is True
+    assert seen_headers[-1].get("api-key") == "valid-test-key"
+
+    # Chave inválida (401) -> qdrant_ok=False
+    monkeypatch.setattr("src.api.main.urllib.request.urlopen", unauthorized_urlopen)
+    unauth_data = client.get("/health").json()
+    assert unauth_data["qdrant_configured"] is True
+    assert unauth_data["qdrant_ok"] is False
+
+    # Sem permissão (403) -> qdrant_ok=False
+    monkeypatch.setattr("src.api.main.urllib.request.urlopen", forbidden_urlopen)
+    forbid_data = client.get("/health").json()
+    assert forbid_data["qdrant_configured"] is True
+    assert forbid_data["qdrant_ok"] is False
+
+    # Indisponibilidade de rede -> qdrant_ok=False
+    monkeypatch.setattr("src.api.main.urllib.request.urlopen", failing_urlopen)
+    down_data = client.get("/health").json()
+    assert down_data["qdrant_configured"] is True
+    assert down_data["qdrant_ok"] is False
 
 
 def test_session_cookie_header_isolation_and_persistence(tmp_path: Path):

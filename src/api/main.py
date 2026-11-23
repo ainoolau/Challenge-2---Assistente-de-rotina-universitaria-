@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import urllib.request
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -79,6 +80,31 @@ from .storage import (
     VersionConflictError,
     VezoStore,
 )
+
+
+def _probe_qdrant_health(timeout: float = 2.0) -> tuple[bool, bool]:
+    """Verifica acesso autenticado da API ao Qdrant via `GET /collections` (sem vazar segredos)."""
+    qdrant_url = os.getenv("QDRANT_URL", "").strip()
+    if qdrant_url:
+        headers = {"User-Agent": "vezo-api-health/1.0"}
+        api_key = os.getenv("QDRANT_API_KEY", "").strip()
+        if api_key:
+            headers["api-key"] = api_key
+        # Usa leitura autenticada (`/collections`) em vez de `/readyz`, pois endpoints
+        # de saúde do Qdrant respondem 200 mesmo com chave inválida ou sem permissão.
+        req = urllib.request.Request(
+            f"{qdrant_url.rstrip('/')}/collections",
+            headers=headers,
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return True, 200 <= int(resp.status) < 300
+        except Exception:
+            return True, False
+    if Path("data/qdrant").is_dir():
+        return True, True
+    return False, False
 
 
 def _overlaps_protected_sleep(interval: Interval, prefs: SessionPreferences) -> bool:
@@ -208,12 +234,12 @@ def create_app(
 
     @app.get("/health", response_model=HealthResponse, tags=["health"])
     def health(store_dep: StoreDep) -> HealthResponse:
+        qdrant_configured, qdrant_ok = _probe_qdrant_health()
         return HealthResponse(
             status="ok",
             db_ok=store_dep.ping(),
-            qdrant_configured=bool(
-                os.getenv("QDRANT_URL") or Path("data/qdrant").is_dir()
-            ),
+            qdrant_configured=qdrant_configured,
+            qdrant_ok=qdrant_ok,
             llm_configured=bool(os.getenv("GROQ_API_KEY")),
         )
 

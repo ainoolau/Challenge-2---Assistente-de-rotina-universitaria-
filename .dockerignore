@@ -1,0 +1,38 @@
+# Controle de versão e ambientes locais
+.git/
+.github/
+.venv/
+venv/
+env/
+.agents/
+
+# Segredos (NUNCA incluir no contexto de build Docker)
+.env
+.env.*
+!.env.example
+
+# Caches e artefatos locais
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+mlruns/
+mlartifacts/
+.mlflow/
+models/
+reports/multiagents/
+uploads/
+
+# Bancos locais (persistência via volume Docker)
+data/*
+!data/samples/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+
+# Frontend (build separado na Vercel / container próprio)
+frontend/node_modules/
+frontend/.next/
+frontend/
