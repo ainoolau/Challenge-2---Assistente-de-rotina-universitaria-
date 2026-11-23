@@ -1,12 +1,19 @@
 """Script de Avaliação Formal de Retrieval (Evaluation Benchmark Completo)."""
 
 import json
+import os
+import sys
 import time
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
-from qdrant_client import QdrantClient
-from sentence_transformers import SentenceTransformer
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.mlops.tracker import get_default_tracker  # noqa: E402
 
 warnings.filterwarnings("ignore", category=UserWarning, module="qdrant_client")
 
@@ -17,6 +24,66 @@ MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
 # Limiar de similaridade para considerar uma resposta confiável (Confidence Threshold)
 SIMILARITY_THRESHOLD = 0.50
+
+VERIFIED_METADATA_FIELDS = (
+    "ingestion_version",
+    "chunk_strategy",
+    "chunk_size",
+    "chunk_overlap",
+)
+
+
+def extract_verified_collection_metadata(
+    payloads: Sequence[dict[str, Any]],
+) -> dict[str, str]:
+    """Deriva parâmetros de indexação apenas de metadados reais gravados na coleção.
+
+    Nunca confia em variáveis de ambiente de execução (`VEZO_CHUNK_*`): se o campo
+    não estiver gravado nos pontos inspecionados, registra `"unknown"`; se houver
+    valores conflitantes na mesma coleção, registra `"mixed"`.
+    """
+    verified: dict[str, str] = {}
+    for field in VERIFIED_METADATA_FIELDS:
+        observed: set[str] = set()
+        for payload in payloads:
+            raw = payload.get(field)
+            if raw is None:
+                continue
+            val = str(raw).strip()
+            if val:
+                observed.add(val)
+        if not observed:
+            verified[field] = "unknown"
+        elif len(observed) == 1:
+            verified[field] = next(iter(observed))
+        else:
+            verified[field] = "mixed"
+    return verified
+
+
+def build_mlflow_eval_params(
+    payloads: Sequence[dict[str, Any]],
+    *,
+    embedding_model: str = MODEL_NAME,
+    collection: str = COLLECTION_NAME,
+    top_k: int = 3,
+    threshold: float = SIMILARITY_THRESHOLD,
+) -> dict[str, Any]:
+    """Monta parâmetros auditáveis do benchmark a partir da coleção e execução reais."""
+    meta = extract_verified_collection_metadata(payloads)
+    return {
+        "embedding_model": embedding_model,
+        "collection": collection,
+        "ingestion_version": meta["ingestion_version"],
+        "chunk_strategy": meta["chunk_strategy"],
+        "chunk_size": meta["chunk_size"],
+        "chunk_overlap": meta["chunk_overlap"],
+        "top_k": top_k,
+        "threshold": threshold,
+        # Este script executa busca vetorial direta sem etapa de reranking.
+        "reranker": "none",
+    }
+
 
 EVAL_DATASET = [
     # --- BLOCO A: HOMOLOGAÇÃO FUNCIONAL MULTIMODAL ---
@@ -112,13 +179,27 @@ EVAL_DATASET = [
 
 
 def run_evaluation():
+    from qdrant_client import QdrantClient
+    from sentence_transformers import SentenceTransformer
+
     print("=" * 75)
     print("   BENCHMARK FORMAL DE RETRIEVAL — HOMOLOGAÇÃO & ROBUSTEZ")
     print(f"   Coleção: {COLLECTION_NAME} | Modelo: {MODEL_NAME}")
     print("=" * 75)
 
-    client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+    qdrant_url = os.getenv("QDRANT_URL")
+    if qdrant_url:
+        client = QdrantClient(url=qdrant_url, api_key=os.getenv("QDRANT_API_KEY"))
+    else:
+        client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
     model = SentenceTransformer(MODEL_NAME)
+
+    chunk_count = 0
+    try:
+        info = client.get_collection(COLLECTION_NAME)
+        chunk_count = int(info.points_count or 0)
+    except Exception:
+        chunk_count = 0
 
     latencies = []
     reciprocal_ranks = []
@@ -127,6 +208,18 @@ def run_evaluation():
     hits_at_5 = 0
     keyword_hits = 0
     negative_abstained = 0
+    negative_top_scores: list[float] = []
+    observed_payloads: list[dict[str, Any]] = []
+    try:
+        scrolled, _ = client.scroll(
+            collection_name=COLLECTION_NAME,
+            limit=256,
+            with_payload=True,
+            with_vectors=False,
+        )
+        observed_payloads = [dict(p.payload or {}) for p in scrolled]
+    except Exception:
+        observed_payloads = []
 
     valid_queries_count = sum(1 for q in EVAL_DATASET if not q["is_negative"])
     negative_queries_count = sum(1 for q in EVAL_DATASET if q["is_negative"])
@@ -165,8 +258,11 @@ def run_evaluation():
         latencies.append(elapsed_ms)
 
         top_score = points[0].score if points else 0.0
+        if not observed_payloads and points:
+            observed_payloads.extend(dict(p.payload or {}) for p in points)
 
         if is_negative:
+            negative_top_scores.append(float(top_score))
             status = (
                 "ABSTENÇÃO CORRETA"
                 if top_score < SIMILARITY_THRESHOLD
@@ -259,26 +355,59 @@ def run_evaluation():
     print(f"   • Latência Média Geral de Retrieval:          {avg_latency:.1f} ms")
     print("=" * 75)
 
+    mlflow_params = build_mlflow_eval_params(
+        observed_payloads,
+        embedding_model=MODEL_NAME,
+        collection=COLLECTION_NAME,
+        top_k=3,
+        threshold=SIMILARITY_THRESHOLD,
+    )
+
+    summary_payload = {
+        "total_factual_queries": valid_queries_count,
+        "hit_rate_at_1": hit_rate_1,
+        "hit_rate_at_3": hit_rate_3,
+        "hit_rate_at_5": hit_rate_5,
+        "keyword_match_rate_at_3": keyword_match_rate,
+        "mrr": round(mrr, 4),
+        "negative_cases_tested": negative_queries_count,
+        "negative_abstained": negative_abstained,
+        "negative_top_score": (
+            round(max(negative_top_scores), 4) if negative_top_scores else None
+        ),
+        "avg_latency_ms": round(avg_latency, 2),
+        "chunk_count": chunk_count,
+        "ingestion_version": mlflow_params["ingestion_version"],
+        "collection": COLLECTION_NAME,
+        "model": MODEL_NAME,
+    }
+
     Path("reports").mkdir(exist_ok=True)
     with open("reports/evaluation_summary.json", "w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "total_factual_queries": valid_queries_count,
-                "hit_rate_at_1": hit_rate_1,
-                "hit_rate_at_3": hit_rate_3,
-                "hit_rate_at_5": hit_rate_5,
-                "keyword_match_rate_at_3": keyword_match_rate,
-                "mrr": round(mrr, 4),
-                "negative_cases_tested": negative_queries_count,
-                "avg_latency_ms": round(avg_latency, 2),
-                "collection": COLLECTION_NAME,
-                "model": MODEL_NAME,
-            },
-            f,
-            indent=2,
-            ensure_ascii=False,
-        )
-    print("[✓] Relatório consolidado exportado: reports/evaluation_summary.json\n")
+        json.dump(summary_payload, f, indent=2, ensure_ascii=False)
+    print("[✓] Relatório consolidado exportado: reports/evaluation_summary.json")
+
+    logged = get_default_tracker().log_retrieval_evaluation(
+        metrics={
+            "hit_rate_at_1": hit_rate_1,
+            "hit_rate_at_3": hit_rate_3,
+            "hit_rate_at_5": hit_rate_5,
+            "keyword_match_rate_at_3": keyword_match_rate,
+            "mrr": round(mrr, 4),
+            "avg_latency_ms": round(avg_latency, 2),
+            "chunk_count": chunk_count,
+            "negative_abstained": negative_abstained,
+            "negative_cases_tested": negative_queries_count,
+            "negative_top_score": (
+                round(max(negative_top_scores), 4) if negative_top_scores else None
+            ),
+        },
+        params=mlflow_params,
+    )
+    if logged:
+        print("[✓] Métricas registradas no MLflow.\n")
+    else:
+        print("[i] MLflow indisponível ou desabilitado (no-op seguro).\n")
 
 
 if __name__ == "__main__":
