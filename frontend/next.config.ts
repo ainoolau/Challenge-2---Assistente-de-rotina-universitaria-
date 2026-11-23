@@ -10,7 +10,18 @@ import type { NextConfig } from "next";
  */
 const apiProxyTarget = process.env.API_PROXY_TARGET?.replace(/\/+$/, "");
 
+/**
+ * Origens adicionais permitidas em desenvolvimento (`next dev -H 0.0.0.0`),
+ * separadas por vírgula (ex.: `ALLOWED_DEV_ORIGINS=192.168.10.253`).
+ * Permite testar o PWA no celular na mesma rede Wi-Fi sem bloquear `/_next/*`.
+ */
+const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const nextConfig: NextConfig = {
+  ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
