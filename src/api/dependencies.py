@@ -68,9 +68,6 @@ class DefaultOrchestratorManager:
     def get(
         self, scope: str = "demo", user_id: str | None = None
     ) -> MultiAgentOrchestrator:
-        if scope == "demo" and self._orchestrator is not None:
-            return self._orchestrator
-
         env_path = Path(".env")
         if not os.getenv("GROQ_API_KEY") and env_path.is_file():
             load_api_key(env_path)
@@ -102,9 +99,6 @@ class DefaultOrchestratorManager:
             mode="live",
             config={"source": "fastapi"},
         )
-        if scope == "demo":
-            self._retriever = retriever
-            self._orchestrator = orchestrator
         return orchestrator
 
     def close(self) -> None:

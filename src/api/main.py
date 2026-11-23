@@ -884,7 +884,7 @@ def create_app(
             try:
                 result = await run_in_threadpool(orchestrator.run, agent_req)
             finally:
-                if orchestrator_provider is None and payload.scope == "private":
+                if orchestrator_provider is None:
                     orchestrator.research.retriever.close()
         except ServiceUnavailableError as exc:
             raise HTTPException(

@@ -562,3 +562,86 @@ def test_document_upload_rejects_invalid_and_oversized(api_client):
         client.post("/documents/upload", files={"file": ("empty.txt", b"")}).status_code
         == 400
     )
+
+
+def test_upload_chat_isolation_and_demo_end_to_end(tmp_path, monkeypatch):
+    import numpy as np
+    from qdrant_client import QdrantClient, models
+    from sentence_transformers import SentenceTransformer
+
+    from src.data_pipeline import retrieval
+
+    class Embedder:
+        def encode(self, sentences, **kwargs):
+            return np.array([[1.0] + [0.0] * 383 for _ in sentences])
+
+    class SharedClient:
+        def __init__(self, client):
+            self.client = client
+
+        def __getattr__(self, key):
+            return getattr(self.client, key)
+
+        def close(self):
+            pass
+
+    db = QdrantClient(":memory:")
+    db.create_collection(
+        "rotina_estudante_multimodal",
+        vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE),
+    )
+    db.upsert(
+        "rotina_estudante_multimodal",
+        [
+            models.PointStruct(
+                id=1,
+                vector=[1.0] + [0.0] * 383,
+                payload={
+                    "source": "demo.txt",
+                    "text": "Documento institucional da residência.",
+                    "user_id": "demo",
+                    "task_type": "texto",
+                    "chunk_index": 0,
+                },
+            )
+        ],
+    )
+    monkeypatch.setenv("GROQ_API_KEY", "test-only")
+    monkeypatch.setattr(retrieval, "get_client", lambda *args: SharedClient(db))
+    monkeypatch.setattr(retrieval, "load_embedder", lambda: Embedder())
+    monkeypatch.setattr(
+        SentenceTransformer, "__new__", lambda cls, *args, **kwargs: Embedder()
+    )
+    monkeypatch.setattr("src.api.dependencies.GroqLLM", lambda *args: SimulatedLLM())
+    app = create_app(db_path=tmp_path / "test.db")
+    with TestClient(app) as a, TestClient(app) as b:
+        _create_session(a)
+        _create_session(b)
+        for client, text in [
+            (a, "O prazo exclusivo da sessão A é segunda-feira."),
+            (b, "O prazo exclusivo da sessão B é sexta-feira."),
+        ]:
+            response = client.post(
+                "/documents/upload",
+                files={"file": ("prazo.txt", text.encode(), "text/plain")},
+            )
+            assert response.status_code == 201, response.text
+        assert [x["filename"] for x in a.get("/documents").json()] == ["prazo.txt"]
+        for client, expected, forbidden in [
+            (a, "segunda-feira", "sexta-feira"),
+            (b, "sexta-feira", "segunda-feira"),
+        ]:
+            response = client.post(
+                "/chat/query", json={"question": "Qual é o prazo?", "scope": "private"}
+            )
+            assert response.status_code == 200, response.text
+            result = response.json()
+            assert expected in result["answer"] and forbidden not in result["answer"]
+            assert "[C1: prazo.txt]" in result["answer"]
+        demo = a.post(
+            "/chat/query", json={"question": "Qual é a informação?", "scope": "demo"}
+        )
+        assert demo.status_code == 200, demo.text
+        assert "[C1: demo.txt]" in demo.json()["answer"]
+        assert "institucional" in demo.json()["answer"]
+    db.close()

@@ -84,11 +84,7 @@ def get_client(local_path: Path | str | None = None) -> QdrantClient:
     if url:
         return QdrantClient(url=url, api_key=os.getenv("QDRANT_API_KEY"))
     path = Path(local_path or DEFAULT_LOCAL_PATH)
-    if not path.is_dir():
-        raise FileNotFoundError(
-            f"Base vetorial local não encontrada em {path}. "
-            "Rode a ingestão (python -m src.data_pipeline.ingestion) ou defina QDRANT_URL."
-        )
+    path.mkdir(parents=True, exist_ok=True)
     return QdrantClient(path=str(path))
 
 
