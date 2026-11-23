@@ -411,3 +411,52 @@ def test_evaluate_rag_script_imports_src_without_pythonpath(tmp_path: Path):
         check=False,
     )
     assert proc.returncode == 0, f"Falha ao importar evaluate_rag.py: {proc.stderr}"
+
+
+def test_evaluate_rag_ignores_divergent_env_vars_and_uses_verified_collection_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Variáveis de ambiente divergentes não devem rotular incorretamente a coleção."""
+    from scripts.evaluate_rag import build_mlflow_eval_params
+
+    monkeypatch.setenv("VEZO_CHUNK_SIZE", "999")
+    monkeypatch.setenv("VEZO_CHUNK_OVERLAP", "333")
+    monkeypatch.setenv("VEZO_CHUNK_STRATEGY", "forged_strategy")
+    monkeypatch.setenv("VEZO_RERANKER", "forged_reranker")
+
+    # 1. Coleção real sem metadados de chunking -> registra "unknown" (nunca o valor do env)
+    params_missing = build_mlflow_eval_params(
+        [{"ingestion_version": "2.0.0", "text": "trecho real"}]
+    )
+    assert params_missing["ingestion_version"] == "2.0.0"
+    assert params_missing["chunk_strategy"] == "unknown"
+    assert params_missing["chunk_size"] == "unknown"
+    assert params_missing["chunk_overlap"] == "unknown"
+    assert params_missing["reranker"] == "none"
+
+    # 2. Coleção com metadados gravados na ingestão -> usa valores reais e ignora env 999
+    params_verified = build_mlflow_eval_params(
+        [
+            {
+                "ingestion_version": "2.1.0",
+                "chunk_strategy": "structural",
+                "chunk_size": 800,
+                "chunk_overlap": 120,
+            }
+        ]
+    )
+    assert params_verified["ingestion_version"] == "2.1.0"
+    assert params_verified["chunk_strategy"] == "structural"
+    assert params_verified["chunk_size"] == "800"
+    assert params_verified["chunk_overlap"] == "120"
+    assert params_verified["reranker"] == "none"
+
+    # 3. Coleção com chunks heterogêneos -> sinaliza "mixed" sem mascarar divergência
+    params_mixed = build_mlflow_eval_params(
+        [
+            {"ingestion_version": "2.0.0", "chunk_size": 500},
+            {"ingestion_version": "2.1.0", "chunk_size": 800},
+        ]
+    )
+    assert params_mixed["ingestion_version"] == "mixed"
+    assert params_mixed["chunk_size"] == "mixed"

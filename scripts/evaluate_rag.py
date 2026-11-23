@@ -5,7 +5,9 @@ import os
 import sys
 import time
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -22,6 +24,66 @@ MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
 # Limiar de similaridade para considerar uma resposta confiável (Confidence Threshold)
 SIMILARITY_THRESHOLD = 0.50
+
+VERIFIED_METADATA_FIELDS = (
+    "ingestion_version",
+    "chunk_strategy",
+    "chunk_size",
+    "chunk_overlap",
+)
+
+
+def extract_verified_collection_metadata(
+    payloads: Sequence[dict[str, Any]],
+) -> dict[str, str]:
+    """Deriva parâmetros de indexação apenas de metadados reais gravados na coleção.
+
+    Nunca confia em variáveis de ambiente de execução (`VEZO_CHUNK_*`): se o campo
+    não estiver gravado nos pontos inspecionados, registra `"unknown"`; se houver
+    valores conflitantes na mesma coleção, registra `"mixed"`.
+    """
+    verified: dict[str, str] = {}
+    for field in VERIFIED_METADATA_FIELDS:
+        observed: set[str] = set()
+        for payload in payloads:
+            raw = payload.get(field)
+            if raw is None:
+                continue
+            val = str(raw).strip()
+            if val:
+                observed.add(val)
+        if not observed:
+            verified[field] = "unknown"
+        elif len(observed) == 1:
+            verified[field] = next(iter(observed))
+        else:
+            verified[field] = "mixed"
+    return verified
+
+
+def build_mlflow_eval_params(
+    payloads: Sequence[dict[str, Any]],
+    *,
+    embedding_model: str = MODEL_NAME,
+    collection: str = COLLECTION_NAME,
+    top_k: int = 3,
+    threshold: float = SIMILARITY_THRESHOLD,
+) -> dict[str, Any]:
+    """Monta parâmetros auditáveis do benchmark a partir da coleção e execução reais."""
+    meta = extract_verified_collection_metadata(payloads)
+    return {
+        "embedding_model": embedding_model,
+        "collection": collection,
+        "ingestion_version": meta["ingestion_version"],
+        "chunk_strategy": meta["chunk_strategy"],
+        "chunk_size": meta["chunk_size"],
+        "chunk_overlap": meta["chunk_overlap"],
+        "top_k": top_k,
+        "threshold": threshold,
+        # Este script executa busca vetorial direta sem etapa de reranking.
+        "reranker": "none",
+    }
+
 
 EVAL_DATASET = [
     # --- BLOCO A: HOMOLOGAÇÃO FUNCIONAL MULTIMODAL ---
@@ -147,7 +209,17 @@ def run_evaluation():
     keyword_hits = 0
     negative_abstained = 0
     negative_top_scores: list[float] = []
-    observed_ingestion_version: str | None = None
+    observed_payloads: list[dict[str, Any]] = []
+    try:
+        scrolled, _ = client.scroll(
+            collection_name=COLLECTION_NAME,
+            limit=256,
+            with_payload=True,
+            with_vectors=False,
+        )
+        observed_payloads = [dict(p.payload or {}) for p in scrolled]
+    except Exception:
+        observed_payloads = []
 
     valid_queries_count = sum(1 for q in EVAL_DATASET if not q["is_negative"])
     negative_queries_count = sum(1 for q in EVAL_DATASET if q["is_negative"])
@@ -186,10 +258,8 @@ def run_evaluation():
         latencies.append(elapsed_ms)
 
         top_score = points[0].score if points else 0.0
-        if observed_ingestion_version is None and points:
-            version_val = (points[0].payload or {}).get("ingestion_version")
-            if version_val:
-                observed_ingestion_version = str(version_val)
+        if not observed_payloads and points:
+            observed_payloads.extend(dict(p.payload or {}) for p in points)
 
         if is_negative:
             negative_top_scores.append(float(top_score))
@@ -285,6 +355,14 @@ def run_evaluation():
     print(f"   • Latência Média Geral de Retrieval:          {avg_latency:.1f} ms")
     print("=" * 75)
 
+    mlflow_params = build_mlflow_eval_params(
+        observed_payloads,
+        embedding_model=MODEL_NAME,
+        collection=COLLECTION_NAME,
+        top_k=3,
+        threshold=SIMILARITY_THRESHOLD,
+    )
+
     summary_payload = {
         "total_factual_queries": valid_queries_count,
         "hit_rate_at_1": hit_rate_1,
@@ -299,7 +377,7 @@ def run_evaluation():
         ),
         "avg_latency_ms": round(avg_latency, 2),
         "chunk_count": chunk_count,
-        "ingestion_version": observed_ingestion_version or "unknown",
+        "ingestion_version": mlflow_params["ingestion_version"],
         "collection": COLLECTION_NAME,
         "model": MODEL_NAME,
     }
@@ -324,17 +402,7 @@ def run_evaluation():
                 round(max(negative_top_scores), 4) if negative_top_scores else None
             ),
         },
-        params={
-            "embedding_model": MODEL_NAME,
-            "collection": COLLECTION_NAME,
-            "ingestion_version": observed_ingestion_version or "unknown",
-            "chunk_strategy": os.getenv("VEZO_CHUNK_STRATEGY", "fixed_500_50"),
-            "chunk_size": int(os.getenv("VEZO_CHUNK_SIZE", "500")),
-            "chunk_overlap": int(os.getenv("VEZO_CHUNK_OVERLAP", "50")),
-            "top_k": 3,
-            "threshold": SIMILARITY_THRESHOLD,
-            "reranker": os.getenv("VEZO_RERANKER", "none"),
-        },
+        params=mlflow_params,
     )
     if logged:
         print("[✓] Métricas registradas no MLflow.\n")
