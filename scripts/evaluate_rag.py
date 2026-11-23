@@ -1,12 +1,15 @@
 """Script de Avaliação Formal de Retrieval (Evaluation Benchmark Completo)."""
 
 import json
+import os
 import time
 import warnings
 from pathlib import Path
 
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
+
+from src.mlops.tracker import get_default_tracker
 
 warnings.filterwarnings("ignore", category=UserWarning, module="qdrant_client")
 
@@ -117,8 +120,19 @@ def run_evaluation():
     print(f"   Coleção: {COLLECTION_NAME} | Modelo: {MODEL_NAME}")
     print("=" * 75)
 
-    client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+    qdrant_url = os.getenv("QDRANT_URL")
+    if qdrant_url:
+        client = QdrantClient(url=qdrant_url, api_key=os.getenv("QDRANT_API_KEY"))
+    else:
+        client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
     model = SentenceTransformer(MODEL_NAME)
+
+    chunk_count = 0
+    try:
+        info = client.get_collection(COLLECTION_NAME)
+        chunk_count = int(info.points_count or 0)
+    except Exception:
+        chunk_count = 0
 
     latencies = []
     reciprocal_ranks = []
@@ -127,6 +141,8 @@ def run_evaluation():
     hits_at_5 = 0
     keyword_hits = 0
     negative_abstained = 0
+    negative_top_scores: list[float] = []
+    observed_ingestion_version: str | None = None
 
     valid_queries_count = sum(1 for q in EVAL_DATASET if not q["is_negative"])
     negative_queries_count = sum(1 for q in EVAL_DATASET if q["is_negative"])
@@ -165,8 +181,13 @@ def run_evaluation():
         latencies.append(elapsed_ms)
 
         top_score = points[0].score if points else 0.0
+        if observed_ingestion_version is None and points:
+            version_val = (points[0].payload or {}).get("ingestion_version")
+            if version_val:
+                observed_ingestion_version = str(version_val)
 
         if is_negative:
+            negative_top_scores.append(float(top_score))
             status = (
                 "ABSTENÇÃO CORRETA"
                 if top_score < SIMILARITY_THRESHOLD
@@ -259,26 +280,61 @@ def run_evaluation():
     print(f"   • Latência Média Geral de Retrieval:          {avg_latency:.1f} ms")
     print("=" * 75)
 
+    summary_payload = {
+        "total_factual_queries": valid_queries_count,
+        "hit_rate_at_1": hit_rate_1,
+        "hit_rate_at_3": hit_rate_3,
+        "hit_rate_at_5": hit_rate_5,
+        "keyword_match_rate_at_3": keyword_match_rate,
+        "mrr": round(mrr, 4),
+        "negative_cases_tested": negative_queries_count,
+        "negative_abstained": negative_abstained,
+        "negative_top_score": (
+            round(max(negative_top_scores), 4) if negative_top_scores else None
+        ),
+        "avg_latency_ms": round(avg_latency, 2),
+        "chunk_count": chunk_count,
+        "ingestion_version": observed_ingestion_version or "unknown",
+        "collection": COLLECTION_NAME,
+        "model": MODEL_NAME,
+    }
+
     Path("reports").mkdir(exist_ok=True)
     with open("reports/evaluation_summary.json", "w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "total_factual_queries": valid_queries_count,
-                "hit_rate_at_1": hit_rate_1,
-                "hit_rate_at_3": hit_rate_3,
-                "hit_rate_at_5": hit_rate_5,
-                "keyword_match_rate_at_3": keyword_match_rate,
-                "mrr": round(mrr, 4),
-                "negative_cases_tested": negative_queries_count,
-                "avg_latency_ms": round(avg_latency, 2),
-                "collection": COLLECTION_NAME,
-                "model": MODEL_NAME,
-            },
-            f,
-            indent=2,
-            ensure_ascii=False,
-        )
-    print("[✓] Relatório consolidado exportado: reports/evaluation_summary.json\n")
+        json.dump(summary_payload, f, indent=2, ensure_ascii=False)
+    print("[✓] Relatório consolidado exportado: reports/evaluation_summary.json")
+
+    logged = get_default_tracker().log_retrieval_evaluation(
+        metrics={
+            "hit_rate_at_1": hit_rate_1,
+            "hit_rate_at_3": hit_rate_3,
+            "hit_rate_at_5": hit_rate_5,
+            "keyword_match_rate_at_3": keyword_match_rate,
+            "mrr": round(mrr, 4),
+            "avg_latency_ms": round(avg_latency, 2),
+            "chunk_count": chunk_count,
+            "negative_abstained": negative_abstained,
+            "negative_cases_tested": negative_queries_count,
+            "negative_top_score": (
+                round(max(negative_top_scores), 4) if negative_top_scores else None
+            ),
+        },
+        params={
+            "embedding_model": MODEL_NAME,
+            "collection": COLLECTION_NAME,
+            "ingestion_version": observed_ingestion_version or "unknown",
+            "chunk_strategy": os.getenv("VEZO_CHUNK_STRATEGY", "fixed_500_50"),
+            "chunk_size": int(os.getenv("VEZO_CHUNK_SIZE", "500")),
+            "chunk_overlap": int(os.getenv("VEZO_CHUNK_OVERLAP", "50")),
+            "top_k": 3,
+            "threshold": SIMILARITY_THRESHOLD,
+            "reranker": os.getenv("VEZO_RERANKER", "none"),
+        },
+    )
+    if logged:
+        print("[✓] Métricas registradas no MLflow.\n")
+    else:
+        print("[i] MLflow indisponível ou desabilitado (no-op seguro).\n")
 
 
 if __name__ == "__main__":

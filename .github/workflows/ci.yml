@@ -146,7 +146,7 @@ jobs:
               echo "- Status: **PASS** (contrato e bloqueio pré-LLM validados)" >> "$GITHUB_STEP_SUMMARY"
               ;;
             rag-mlops-readiness)
-              pip install pytest qdrant-client
+              pip install pytest qdrant-client "pydantic>=2.6.0"
               pytest tests/test_retrieval.py -v
               MLOPS_NOTE="Pendente (auto-ativa assim que tests/test_mlops.py for criado)"
               if [ -f "tests/test_mlops.py" ]; then

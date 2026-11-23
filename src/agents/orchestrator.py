@@ -3,6 +3,9 @@
 import time
 import urllib.error
 from dataclasses import asdict
+from typing import Any
+
+from src.mlops.tracker import get_default_tracker
 
 from .schemas import AgentRunResult, RunMetrics, TraceEvent
 
@@ -11,7 +14,15 @@ ABSTENTION = "Não encontrei informações suficientes nos documentos disponíve
 
 class MultiAgentOrchestrator:
     def __init__(
-        self, research, analysis, validation, llm, *, mode="live", config=None
+        self,
+        research,
+        analysis,
+        validation,
+        llm,
+        *,
+        mode="live",
+        config=None,
+        tracker: Any = None,
     ):
         self.research, self.analysis, self.validation, self.llm = (
             research,
@@ -20,6 +31,7 @@ class MultiAgentOrchestrator:
             llm,
         )
         self.mode, self.config = mode, config or {}
+        self.tracker = tracker
 
     def run(self, request):
         trace = []
@@ -137,7 +149,7 @@ class MultiAgentOrchestrator:
             llm_calls=calls,
             timezone=request.timezone,
         )
-        return AgentRunResult(
+        result = AgentRunResult(
             run_id=request.run_id,
             request=request,
             status=status,
@@ -156,3 +168,14 @@ class MultiAgentOrchestrator:
             ),
             error=error,
         )
+        active_tracker = (
+            self.tracker
+            if self.tracker is not None
+            else (get_default_tracker() if self.mode == "live" else None)
+        )
+        if active_tracker is not None:
+            try:
+                active_tracker.log_multiagent_run(result)
+            except Exception:
+                pass
+        return result
