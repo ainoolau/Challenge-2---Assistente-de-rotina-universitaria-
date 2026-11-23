@@ -88,7 +88,14 @@ class GroqLLM:
                 include_reasoning=False,
                 stream=False,
                 tool_choice="none",
-                response_format={"type": "json_object"},
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "result",
+                        "schema": output.model_json_schema(),
+                        "strict": False,
+                    },
+                },
             )
             request = urllib.request.Request(
                 "https://api.groq.com/openai/v1/chat/completions",

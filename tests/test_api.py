@@ -74,27 +74,54 @@ def test_health_and_openapi_contract(api_client):
 
 
 def test_health_probes_qdrant_connectivity(api_client, monkeypatch):
+    import urllib.error
     from contextlib import contextmanager
 
     class FakeResp:
         status = 200
 
+    seen_headers: list[dict[str, str]] = []
+
     @contextmanager
     def ok_urlopen(req, timeout=2.0):
-        assert req.full_url == "http://qdrant.internal:6333/readyz"
+        assert req.full_url == "http://qdrant.internal:6333/collections"
+        seen_headers.append({k.lower(): v for k, v in req.header_items()})
         yield FakeResp()
+
+    def unauthorized_urlopen(req, timeout=2.0):
+        raise urllib.error.HTTPError(
+            req.full_url, 401, "Unauthorized", hdrs=None, fp=None
+        )
+
+    def forbidden_urlopen(req, timeout=2.0):
+        raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", hdrs=None, fp=None)
 
     def failing_urlopen(_req, timeout=2.0):
         raise OSError("connection refused")
 
     client, _ = api_client
     monkeypatch.setenv("QDRANT_URL", "http://qdrant.internal:6333")
+    monkeypatch.setenv("QDRANT_API_KEY", "valid-test-key")
 
     monkeypatch.setattr("src.api.main.urllib.request.urlopen", ok_urlopen)
     ok_data = client.get("/health").json()
     assert ok_data["qdrant_configured"] is True
     assert ok_data["qdrant_ok"] is True
+    assert seen_headers[-1].get("api-key") == "valid-test-key"
 
+    # Chave inválida (401) -> qdrant_ok=False
+    monkeypatch.setattr("src.api.main.urllib.request.urlopen", unauthorized_urlopen)
+    unauth_data = client.get("/health").json()
+    assert unauth_data["qdrant_configured"] is True
+    assert unauth_data["qdrant_ok"] is False
+
+    # Sem permissão (403) -> qdrant_ok=False
+    monkeypatch.setattr("src.api.main.urllib.request.urlopen", forbidden_urlopen)
+    forbid_data = client.get("/health").json()
+    assert forbid_data["qdrant_configured"] is True
+    assert forbid_data["qdrant_ok"] is False
+
+    # Indisponibilidade de rede -> qdrant_ok=False
     monkeypatch.setattr("src.api.main.urllib.request.urlopen", failing_urlopen)
     down_data = client.get("/health").json()
     assert down_data["qdrant_configured"] is True
@@ -528,3 +555,193 @@ def test_chat_query_documental_abstention_planning_and_unavailable(tmp_path: Pat
         )
         assert down.status_code == 503
         assert "indisponível" in down.json()["detail"].lower()
+
+
+def test_private_ingestion_isolates_same_filename(tmp_path):
+    from qdrant_client import QdrantClient
+
+    from src.data_pipeline.ingestion import ingest_files
+    from src.data_pipeline.retrieval import search
+
+    class Embedder:
+        def encode(self, sentences, **kwargs):
+            return [[1.0] + [0.0] * 383 for _ in sentences]
+
+    client = QdrantClient(":memory:")
+    model = Embedder()
+    document = tmp_path / "a.txt"
+    for session, content in [
+        ("A", "Documento secreto da primeira sessão."),
+        ("B", "Documento secreto da segunda sessão."),
+    ]:
+        document.write_text(content, encoding="utf-8")
+        summary = ingest_files(
+            [document],
+            collection_name="vezo_user_private",
+            user_id=session,
+            corpus_scope="private",
+            target_collection_scope="private",
+            client=client,
+            embedder=model,
+        )
+        assert summary.processed_files == 1
+    hits_a = search(
+        client, model, "documento", collection="vezo_user_private", user_id="A"
+    )
+    hits_b = search(
+        client, model, "documento", collection="vezo_user_private", user_id="B"
+    )
+    assert len(hits_a) == len(hits_b) == 1
+    assert "primeira" in hits_a[0].text
+    assert "segunda" in hits_b[0].text
+    client.close()
+
+
+def test_document_upload_rejects_invalid_and_oversized(api_client):
+    client, _ = api_client
+    _create_session(client)
+    assert (
+        client.post(
+            "/documents/upload", files={"file": ("bad.exe", b"data")}
+        ).status_code
+        == 400
+    )
+    assert (
+        client.post(
+            "/documents/upload",
+            files={"file": ("big.txt", b"x" * (10 * 1024 * 1024 + 1))},
+        ).status_code
+        == 413
+    )
+    assert (
+        client.post("/documents/upload", files={"file": ("empty.txt", b"")}).status_code
+        == 400
+    )
+
+
+def test_upload_chat_isolation_and_demo_end_to_end(tmp_path, monkeypatch):
+    from qdrant_client import QdrantClient, models
+
+    from src.data_pipeline import retrieval
+
+    class Embedder:
+        def encode(self, sentences, **kwargs):
+            return [[1.0] + [0.0] * 383 for _ in sentences]
+
+    class SharedClient:
+        def __init__(self, client):
+            self.client = client
+
+        def __getattr__(self, key):
+            return getattr(self.client, key)
+
+        def close(self):
+            pass
+
+    db = QdrantClient(":memory:")
+    db.create_collection(
+        "rotina_estudante_multimodal",
+        vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE),
+    )
+    db.upsert(
+        "rotina_estudante_multimodal",
+        [
+            models.PointStruct(
+                id=1,
+                vector=[1.0] + [0.0] * 383,
+                payload={
+                    "source": "demo.txt",
+                    "text": "Documento institucional da residência.",
+                    "user_id": "demo",
+                    "task_type": "texto",
+                    "chunk_index": 0,
+                },
+            )
+        ],
+    )
+    monkeypatch.setenv("GROQ_API_KEY", "test-only")
+    monkeypatch.setattr(
+        retrieval, "get_client", lambda *args, **kwargs: SharedClient(db)
+    )
+    monkeypatch.setattr(retrieval, "load_embedder", lambda: Embedder())
+    llms = []
+
+    def make_llm(*args):
+        llm = SimulatedLLM()
+        llms.append(llm)
+        return llm
+
+    monkeypatch.setattr("src.api.dependencies.GroqLLM", make_llm)
+    app = create_app(db_path=tmp_path / "test.db")
+    with TestClient(app) as a, TestClient(app) as b:
+        _create_session(a)
+        _create_session(b)
+        empty = a.post(
+            "/chat/query", json={"question": "Qual é o prazo?", "scope": "private"}
+        )
+        assert empty.status_code == 200 and empty.json()["abstained"]
+        assert empty.json()["llm_calls"] == 0 and llms[-1].calls == []
+        for client, text in [
+            (
+                a,
+                "O prazo exclusivo da sessão A é segunda-feira. CPF 123.456.789-09 email teste@example.com telefone (11) 99999-8888.",
+            ),
+            (b, "O prazo exclusivo da sessão B é sexta-feira."),
+        ]:
+            response = client.post(
+                "/documents/upload",
+                files={"file": ("prazo.txt", text.encode(), "text/plain")},
+            )
+            assert response.status_code == 201, response.text
+            if client is a:
+                empty_b = b.post(
+                    "/chat/query",
+                    json={"question": "Qual é o prazo?", "scope": "private"},
+                )
+                assert empty_b.status_code == 200 and empty_b.json()["abstained"]
+                assert empty_b.json()["llm_calls"] == 0 and llms[-1].calls == []
+                assert b.get("/documents").json() == []
+                points, _ = db.scroll("vezo_user_private", with_payload=True)
+                payload_text = str(points[0].payload["text"])
+                for secret in (
+                    "123.456.789-09",
+                    "teste@example.com",
+                    "(11) 99999-8888",
+                ):
+                    assert secret not in payload_text
+                assert (
+                    "[CPF_REMOVIDO]" in payload_text
+                    and "[EMAIL_REMOVIDO]" in payload_text
+                    and "[TELEFONE_REMOVIDO]" in payload_text
+                )
+        assert [x["filename"] for x in a.get("/documents").json()] == ["prazo.txt"]
+        for client, expected, forbidden in [
+            (a, "segunda-feira", "sexta-feira"),
+            (b, "sexta-feira", "segunda-feira"),
+        ]:
+            response = client.post(
+                "/chat/query", json={"question": "Qual é o prazo?", "scope": "private"}
+            )
+            assert response.status_code == 200, response.text
+            result = response.json()
+            assert expected in result["answer"] and forbidden not in result["answer"]
+            assert "[C1: prazo.txt]" in result["answer"]
+        demo = a.post(
+            "/chat/query", json={"question": "Qual é a informação?", "scope": "demo"}
+        )
+        assert demo.status_code == 200, demo.text
+        assert "[C1: demo.txt]" in demo.json()["answer"]
+        assert "institucional" in demo.json()["answer"]
+    db.close()
+
+
+def test_qdrant_local_does_not_create_directory_on_read(tmp_path):
+    from src.data_pipeline.retrieval import get_client
+
+    path = tmp_path / "new-qdrant"
+    with pytest.raises(FileNotFoundError):
+        get_client(path)
+    assert not path.exists()
+    client = get_client(path, create_if_missing=True)
+    client.close()
+    assert path.is_dir()

@@ -17,7 +17,7 @@ class Retriever(Protocol):
 
 
 class QdrantRetriever:
-    def __init__(self, local_path=None):
+    def __init__(self, local_path=None, collection=None, user_id=None):
         # Imports tardios: testes simulados não abrem banco nem carregam modelos.
         from qdrant_client.models import Distance
 
@@ -27,9 +27,24 @@ class QdrantRetriever:
             load_embedder,
         )
 
-        self.client = get_client(local_path)
+        self.collection = collection or DEFAULT_COLLECTION
+        self.user_id = user_id
+        if self.collection == "vezo_user_private" and not user_id:
+            raise ValueError("Sessão obrigatória para consulta privada")
         try:
-            info = self.client.get_collection(DEFAULT_COLLECTION)
+            self.client = get_client(local_path)
+        except FileNotFoundError:
+            if self.collection != "vezo_user_private":
+                raise
+            self.client = None
+            return
+        try:
+            if (
+                self.collection == "vezo_user_private"
+                and not self.client.collection_exists(self.collection)
+            ):
+                return
+            info = self.client.get_collection(self.collection)
             vectors = info.config.params.vectors
             if (
                 isinstance(vectors, dict)
@@ -47,7 +62,23 @@ class QdrantRetriever:
     def retrieve(self, question):
         from src.data_pipeline.retrieval import search
 
-        hits = search(self.client, self.model, question, top_k=3)
+        if self.client is None or (
+            self.collection == "vezo_user_private"
+            and not self.client.collection_exists(self.collection)
+        ):
+            return []
+        if not hasattr(self, "model"):
+            from src.data_pipeline.retrieval import load_embedder
+
+            self.model = load_embedder()
+        hits = search(
+            self.client,
+            self.model,
+            question,
+            top_k=3,
+            collection=self.collection,
+            user_id=self.user_id,
+        )
         return [
             EvidenceChunk(
                 source_id=f"C{i}",
@@ -64,7 +95,8 @@ class QdrantRetriever:
         ]
 
     def close(self):
-        self.client.close()
+        if self.client is not None:
+            self.client.close()
 
 
 class ResearchAgent:

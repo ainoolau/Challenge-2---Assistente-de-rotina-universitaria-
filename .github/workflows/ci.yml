@@ -69,7 +69,7 @@ jobs:
               TESTS="tests/test_smoke.py tests/test_planning_core.py tests/test_multiagents.py"
               API_NOTE="Pendente (tests/test_api.py ainda não criado)"
               if [ -f "tests/test_api.py" ]; then
-                pip install "fastapi>=0.110.0" "httpx>=0.27.0"
+                pip install "fastapi>=0.110.0" "httpx>=0.27.0" "python-multipart>=0.0.9" "qdrant-client>=1.8.0"
                 TESTS="$TESTS tests/test_api.py"
                 API_NOTE="Ativo e validado (tests/test_api.py)"
               fi
@@ -533,3 +533,4 @@ jobs:
           fi
 
           echo "Todos os Gate Jobs foram aprovados — ci-verde!"
+
