@@ -16,11 +16,20 @@ import re
 import urllib.request
 from contextlib import AbstractContextManager
 from typing import Any, Protocol
+from uuid import uuid4
 
 DEFAULT_MLFLOW_URI = "http://localhost:5000"
 DEFAULT_RETRIEVAL_EXPERIMENT = "vezo-retrieval-evaluation"
 DEFAULT_INGESTION_EXPERIMENT = "vezo-ingestion"
 DEFAULT_MULTIAGENT_EXPERIMENT = "vezo-multiagents"
+
+_ALLOWED_TOKEN_COUNT_METRICS = frozenset(
+    {
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+    }
+)
 
 _FORBIDDEN_KEY_FRAGMENTS = (
     "api_key",
@@ -59,6 +68,10 @@ _SECRET_AND_PII_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
             r"(?<!\d)(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)(?:9\d{4}|\d{4})-?\d{4}(?!\d)"
         ),
         "[TELEFONE_OCULTO]",
+    ),
+    (
+        re.compile(r"(?i)\b(matr[íi]cula|ra|rga)(\s*[:#_-]?\s*)(\d[\d./-]{3,20})\b"),
+        r"\1\2[MATRICULA_OCULTA]",
     ),
 )
 
@@ -127,7 +140,12 @@ def sanitize_mlflow_metrics(metrics: dict[str, Any] | None) -> dict[str, float]:
     safe: dict[str, float] = {}
     for raw_key, raw_val in metrics.items():
         key = str(raw_key).strip()
-        if _is_forbidden_key(key) or raw_val is None or isinstance(raw_val, bool):
+        normalized = key.lower()
+        if (
+            (_is_forbidden_key(key) and normalized not in _ALLOWED_TOKEN_COUNT_METRICS)
+            or raw_val is None
+            or isinstance(raw_val, bool)
+        ):
             continue
         if isinstance(raw_val, (int, float)):
             val = float(raw_val)
@@ -377,7 +395,9 @@ class VezoMLflowTracker:
             "error_flag": 1.0 if status_str == "error" else 0.0,
         }
 
-        run_id = getattr(result, "run_id", None)
+        # Gera identificador interno opaco para telemetria; nunca propaga
+        # `result.run_id` informado pelo usuário (pode conter matrícula/PII).
+        telemetry_run_name = run_name or f"multiagent-{uuid4().hex[:12]}"
         merged_tags = {
             "component": "multiagent_orchestrator",
             "mode": mode_str,
@@ -386,7 +406,7 @@ class VezoMLflowTracker:
         }
         return self._record_run(
             experiment_name=experiment_name,
-            run_name=run_name or (f"run-{run_id}" if run_id else "multiagent-run"),
+            run_name=telemetry_run_name,
             params=run_params,
             metrics=run_metrics,
             tags=merged_tags,

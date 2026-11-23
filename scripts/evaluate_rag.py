@@ -2,14 +2,16 @@
 
 import json
 import os
+import sys
 import time
 import warnings
 from pathlib import Path
 
-from qdrant_client import QdrantClient
-from sentence_transformers import SentenceTransformer
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.mlops.tracker import get_default_tracker
+from src.mlops.tracker import get_default_tracker  # noqa: E402
 
 warnings.filterwarnings("ignore", category=UserWarning, module="qdrant_client")
 
@@ -115,6 +117,9 @@ EVAL_DATASET = [
 
 
 def run_evaluation():
+    from qdrant_client import QdrantClient
+    from sentence_transformers import SentenceTransformer
+
     print("=" * 75)
     print("   BENCHMARK FORMAL DE RETRIEVAL — HOMOLOGAÇÃO & ROBUSTEZ")
     print(f"   Coleção: {COLLECTION_NAME} | Modelo: {MODEL_NAME}")

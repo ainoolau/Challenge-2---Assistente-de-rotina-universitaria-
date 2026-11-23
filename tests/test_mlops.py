@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import subprocess
+import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -136,18 +140,32 @@ def test_sanitization_blocks_secrets_pii_prompts_and_non_finite_metrics():
     assert "[REDACTED_TOKEN]" in note
 
     assert sanitize_mlflow_text("x" * 300, max_length=20).endswith("...")
+    assert "20261234" not in sanitize_mlflow_text("run-matricula-20261234")
+    assert "[MATRICULA_OCULTA]" in sanitize_mlflow_text("run-matricula-20261234")
+    assert "202612345" not in sanitize_mlflow_text("RA: 202612345")
 
     clean_metrics = sanitize_mlflow_metrics(
         {
             "mrr": 0.75,
             "chunks": 162,
+            "input_tokens": 1200,
+            "output_tokens": 350,
+            "llm_calls": 4,
+            "session_token": 999,
+            "access_token": 888,
             "bad_nan": math.nan,
             "bad_inf": math.inf,
             "bool_ignored": True,
             "api_key_count": 99,
         }
     )
-    assert clean_metrics == {"mrr": 0.75, "chunks": 162.0}
+    assert clean_metrics == {
+        "mrr": 0.75,
+        "chunks": 162.0,
+        "input_tokens": 1200.0,
+        "output_tokens": 350.0,
+        "llm_calls": 4.0,
+    }
 
 
 def test_log_retrieval_evaluation_and_ingestion_summary():
@@ -304,3 +322,92 @@ def test_orchestrator_logs_sanitized_multiagent_metrics_without_pii_or_secrets()
     )
     safe_result = resilient.run(demo_request("fora_dominio"))
     assert safe_result.status == "abstained"
+
+
+def test_log_multiagent_run_preserves_token_counts_and_hides_user_run_id():
+    pytest.importorskip("pydantic")
+
+    from src.agents.demo import demo_request
+    from src.agents.schemas import AgentRunResult, RetrievalResult, RunMetrics
+
+    backend = FakeMLflowBackend()
+    tracker = VezoMLflowTracker(
+        tracking_uri="http://localhost:5000", enabled=True, backend=backend
+    )
+
+    # run_id fornecido pelo usuário contendo matrícula nunca deve ir ao MLflow
+    req = demo_request("documental").model_copy(
+        update={"run_id": "run-matricula-20261234"}
+    )
+    result = AgentRunResult(
+        run_id=req.run_id,
+        request=req,
+        status="completed",
+        mode="live",
+        config={
+            "source": "api-test",
+            "threshold": 0.5,
+            "top_k": 3,
+            "max_corrections": 1,
+            "timezone": req.timezone,
+            "llm": {"model": "openai/gpt-oss-20b"},
+            "llm_calls": [
+                {"latency_ms": 420.5, "rate_limit_wait_ms": 0.0},
+                {"latency_ms": 380.0, "rate_limit_wait_ms": 150.0},
+            ],
+        },
+        retrieval=RetrievalResult(abstained=False, top_score=0.72, chunks=[]),
+        proposal=None,
+        validation=None,
+        final_answer="Resposta auditada.",
+        trace=[],
+        metrics=RunMetrics(
+            total_latency_ms=950.5,
+            llm_calls=2,
+            input_tokens=1450,
+            output_tokens=280,
+        ),
+    )
+
+    assert tracker.log_multiagent_run(result) is True
+    assert len(backend.runs) == 1
+    logged = backend.runs[0]
+
+    # Métricas numéricas de tokens exigidas pela issue #82 devem ser preservadas
+    assert logged["metrics"]["llm_calls"] == pytest.approx(2.0)
+    assert logged["metrics"]["input_tokens"] == pytest.approx(1450.0)
+    assert logged["metrics"]["output_tokens"] == pytest.approx(280.0)
+    assert logged["metrics"]["http_latency_ms"] == pytest.approx(800.5)
+    assert logged["metrics"]["rate_limit_wait_ms"] == pytest.approx(150.0)
+
+    # Identificador interno opaco — nenhuma parte do run_id do usuário pode vazar
+    assert str(logged["run_name"]).startswith("multiagent-")
+    serialized = json.dumps(logged, ensure_ascii=False)
+    assert "20261234" not in serialized
+    assert "matricula" not in serialized.lower()
+
+
+def test_evaluate_rag_script_imports_src_without_pythonpath(tmp_path: Path):
+    """Garante execução direta de `python scripts/evaluate_rag.py` sem PYTHONPATH."""
+    repo_root = Path(__file__).resolve().parents[1]
+    script_path = repo_root / "scripts" / "evaluate_rag.py"
+
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+
+    probe = (
+        "import runpy, sys; "
+        f"sys.path[0] = {str(script_path.parent)!r}; "
+        f"ns = runpy.run_path({str(script_path)!r}, run_name='evaluate_rag_probe'); "
+        "assert callable(ns['get_default_tracker']); "
+        "assert callable(ns['run_evaluation'])"
+    )
+    proc = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, f"Falha ao importar evaluate_rag.py: {proc.stderr}"
