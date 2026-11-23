@@ -229,13 +229,21 @@ export const api = {
       }),
     create: (body: ScheduleItemCreate) =>
       apiRequest<ScheduleItemResponse>("/schedule", { method: "POST", body }),
-    update: (itemId: string, body: ScheduleItemUpdate) =>
+    update: (
+      itemId: string,
+      body: ScheduleItemUpdate,
+      options?: { forceFixed?: boolean },
+    ) =>
       apiRequest<ScheduleItemResponse>(`/schedule/${enc(itemId)}`, {
         method: "PATCH",
         body,
+        query: options?.forceFixed ? { force_fixed: "true" } : undefined,
       }),
-    remove: (itemId: string) =>
-      apiRequest<void>(`/schedule/${enc(itemId)}`, { method: "DELETE" }),
+    remove: (itemId: string, options?: { forceFixed?: boolean }) =>
+      apiRequest<void>(`/schedule/${enc(itemId)}`, {
+        method: "DELETE",
+        query: options?.forceFixed ? { force_fixed: "true" } : undefined,
+      }),
     optimize: (body: OptimizeScheduleRequest) =>
       apiRequest<ScheduleProposalResponse>("/schedule/optimize", {
         method: "POST",
