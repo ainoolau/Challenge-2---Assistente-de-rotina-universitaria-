@@ -11,6 +11,9 @@ requires-python = ">=3.11,<3.12"
 dependencies = [
     "jsonschema>=4.18.0",
     "fastapi>=0.110.0",
+    "python-multipart>=0.0.9",
+    "PyMuPDF",
+    "python-docx",
     "uvicorn>=0.28.0",
     "pydantic>=2.6.0",
     "streamlit>=1.32.0",

@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 
@@ -61,14 +61,9 @@ SessionDep = Annotated[SessionRecord, Depends(require_session)]
 class DefaultOrchestratorManager:
     """Inicialização tardia e segura de QdrantRetriever + GroqLLM para /chat/query."""
 
-    def __init__(self) -> None:
-        self._retriever: Any = None
-        self._orchestrator: MultiAgentOrchestrator | None = None
-
-    def get(self) -> MultiAgentOrchestrator:
-        if self._orchestrator is not None:
-            return self._orchestrator
-
+    def get(
+        self, scope: str = "demo", user_id: str | None = None
+    ) -> MultiAgentOrchestrator:
         env_path = Path(".env")
         if not os.getenv("GROQ_API_KEY") and env_path.is_file():
             load_api_key(env_path)
@@ -80,7 +75,10 @@ class DefaultOrchestratorManager:
             )
 
         try:
-            retriever = QdrantRetriever()
+            retriever = QdrantRetriever(
+                collection="vezo_user_private" if scope == "private" else None,
+                user_id=user_id if scope == "private" else None,
+            )
         except Exception as exc:
             raise ServiceUnavailableError(
                 "Base vetorial Qdrant indisponível no momento. "
@@ -89,8 +87,7 @@ class DefaultOrchestratorManager:
 
         min_interval = float(os.getenv("VEZO_LLM_MIN_CALL_INTERVAL", "0"))
         llm = GroqLLM(LLMConfig(min_call_interval=min_interval))
-        self._retriever = retriever
-        self._orchestrator = MultiAgentOrchestrator(
+        orchestrator = MultiAgentOrchestrator(
             ResearchAgent(retriever, llm),
             AnalysisPlanningAgent(llm),
             ValidationAgent(llm),
@@ -98,10 +95,7 @@ class DefaultOrchestratorManager:
             mode="live",
             config={"source": "fastapi"},
         )
-        return self._orchestrator
+        return orchestrator
 
     def close(self) -> None:
-        if self._retriever is not None:
-            self._retriever.close()
-            self._retriever = None
-        self._orchestrator = None
+        """Os clientes são fechados ao final de cada consulta."""

@@ -143,6 +143,8 @@ Implementada com **FastAPI + Pydantic v2 + SQLite transacional** (`VezoStore`, c
 - `POST /schedule/reallocate` — executa `src.core.planning.rebalance` + `audit_rebalance` sobre os blocos flexíveis do horizonte e salva proposta `pending` com diff explícito e `requires_confirmation=True`.
 - `POST /schedule/proposals/{proposal_id}/confirm` — valida titularidade, status `pending`, reaudita invariantes, verifica `base_version == schedule_version` (`409 Conflict` se defasada) e aplica os blocos flexíveis em transação atômica SQLite preservando sono e fixos.
 - `POST /schedule/proposals/{proposal_id}/reject` — rejeita proposta preservando a agenda intacta.
+- `POST /documents/upload` / `GET /documents` — upload autenticado de PDF, TXT, DOCX e imagens PNG/JPG/JPEG (limite de 10 MiB), extração e mascaramento PII antes de indexar em `vezo_user_private`; listagem limitada à sessão.
+- O campo `scope` em `POST /chat/query` aceita `private` ou `demo` (padrão `demo`); consultas privadas filtram `user_id` da sessão e `corpus_scope=private` no Qdrant.
 - `POST /chat/query` / `GET /chat/history` — executa `MultiAgentOrchestrator` de forma assíncrona (`run_in_threadpool`), devolve resposta, `abstained`, `citations` tipadas, `limitations`/`gaps`, cria proposta pendente (`proposal_id`) quando houver planejamento e retorna `503` sanitizado em indisponibilidade de Qdrant/Groq (sem inventar resposta).
 
 ---
@@ -161,3 +163,4 @@ Implementada com **FastAPI + Pydantic v2 + SQLite transacional** (`VezoStore`, c
 - **MLflow (`infra/docker-compose.yml` → `http://localhost:5000`):** backend SQLite + artifacts em volume Docker `routine_mlflow_data`. A camada `src/mlops/` registrará parâmetros (`embedding_model`, `chunk_size`, `threshold`, `llm_model`, `top_k`), métricas (`hit_at_3`, `mrr`, `latency_ms`, `rate_limit_wait_ms`, `input_tokens`, `output_tokens`, `abstention_rate`) e artefatos sanitizados.
 - **Benchmark Comparativo (`tests/benchmark_*`, `scripts/scenarios/`):** Golden Set oficial (`GS-01`–`GS-12`, v1.0.0) e JSON Schema Draft 2020-12 (`contract_version: 1.0.0`). `zero_shot.py` permanece 100% isolado de Qdrant/RAG.
 - **CI/CD (`.github/workflows/ci.yml`):** esteira modular com 5 matrizes e gates (`Backend Approved` incluindo `test_planning_core.py` e auto-ativação de `test_api.py`, `MLOps Approved`, `Infra Approved` com guardrails LGPD/binários/`.db`, `Frontend Approved` auto-ativável e `Runtime Approved`), consolidados no gate obrigatório `ci-verde`.
+

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
@@ -72,7 +73,9 @@ def expected_rank(
     return None
 
 
-def get_client(local_path: Path | str | None = None) -> QdrantClient:
+def get_client(
+    local_path: Path | str | None = None, *, create_if_missing: bool = False
+) -> QdrantClient:
     """Servidor se QDRANT_URL estiver definido; senão, o Qdrant local em disco.
 
     Atenção: no modo local só um processo abre a pasta por vez. Rode a demo
@@ -85,13 +88,13 @@ def get_client(local_path: Path | str | None = None) -> QdrantClient:
         return QdrantClient(url=url, api_key=os.getenv("QDRANT_API_KEY"))
     path = Path(local_path or DEFAULT_LOCAL_PATH)
     if not path.is_dir():
-        raise FileNotFoundError(
-            f"Base vetorial local não encontrada em {path}. "
-            "Rode a ingestão (python -m src.data_pipeline.ingestion) ou defina QDRANT_URL."
-        )
+        if not create_if_missing:
+            raise FileNotFoundError(f"Base vetorial local não encontrada em {path}.")
+        path.mkdir(parents=True, exist_ok=True)
     return QdrantClient(path=str(path))
 
 
+@lru_cache(maxsize=1)
 def load_embedder(model_name: str = EMBEDDING_MODEL) -> Embedder:
     from sentence_transformers import SentenceTransformer
 
@@ -104,6 +107,7 @@ def search(
     query: str,
     top_k: int = 3,
     collection: str = DEFAULT_COLLECTION,
+    user_id: str | None = None,
 ) -> list[SearchHit]:
     """Busca os top_k trechos mais próximos da pergunta.
 
@@ -113,9 +117,26 @@ def search(
     vector = model.encode([query], normalize_embeddings=True, show_progress_bar=False)[
         0
     ]
+    from qdrant_client import models
+
+    query_filter = (
+        models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="user_id", match=models.MatchValue(value=user_id)
+                ),
+                models.FieldCondition(
+                    key="corpus_scope", match=models.MatchValue(value="private")
+                ),
+            ]
+        )
+        if user_id is not None
+        else None
+    )
     response = client.query_points(
         collection_name=collection,
         query=[float(x) for x in vector],
+        query_filter=query_filter,
         limit=top_k,
         with_payload=True,
     )
