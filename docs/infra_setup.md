@@ -39,10 +39,16 @@ Validar sintaxe do Compose (mesmo check executado no CI):
 docker compose -f infra/docker-compose.yml config --quiet
 ```
 
-Rodar smoke test ponta a ponta contra a stack ativa (sem expor chaves/tokens):
+Rodar smoke test ponta a ponta contra a stack ativa (valida também conectividade real `API -> Qdrant` e atributo `HttpOnly` no `Set-Cookie`, sem expor chaves/tokens):
 
 ```bash
 python scripts/smoke_e2e.py
+```
+
+Se `API_PORT` tiver sido personalizada no `.env` ou no ambiente, o script a detecta automaticamente; também é possível informar explicitamente:
+
+```bash
+python scripts/smoke_e2e.py --api-url http://localhost:<API_PORT>
 ```
 
 ## 4. Segurança e LGPD

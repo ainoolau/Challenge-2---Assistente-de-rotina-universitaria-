@@ -54,11 +54,13 @@ docker compose -f infra/docker-compose.yml exec api python -m src.data_pipeline.
 
 ### 4. Smoke Test Ponta a Ponta (sem expor segredos)
 
-Com os containers saudáveis, valide saúde dos 3 serviços, criação de sessão com cookie `HttpOnly`, CRUD `/schedule`, trava de sono protegido (`HTTP 409`) e proposta com confirmação explícita:
+Com os containers saudáveis, valide saúde dos 3 serviços, conectividade real da API com o Qdrant, criação de sessão com cookie `HttpOnly`, CRUD `/schedule`, trava de sono protegido (`HTTP 409`) e proposta com confirmação explícita:
 
 ```bash
 python scripts/smoke_e2e.py
 ```
+
+*(O script detecta automaticamente `API_PORT` do ambiente ou do `.env`; para informar outro endereço explicitamente, use `python scripts/smoke_e2e.py --api-url http://localhost:<API_PORT>`.)*
 
 Verificação rápida manual via `curl`:
 
