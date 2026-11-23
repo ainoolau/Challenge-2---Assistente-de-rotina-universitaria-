@@ -502,7 +502,6 @@ def test_chat_query_documental_abstention_planning_and_unavailable(tmp_path: Pat
 
 
 def test_private_ingestion_isolates_same_filename(tmp_path):
-    import numpy as np
     from qdrant_client import QdrantClient
 
     from src.data_pipeline.ingestion import ingest_files
@@ -510,7 +509,7 @@ def test_private_ingestion_isolates_same_filename(tmp_path):
 
     class Embedder:
         def encode(self, sentences, **kwargs):
-            return np.array([[1.0] + [0.0] * 383 for _ in sentences])
+            return [[1.0] + [0.0] * 383 for _ in sentences]
 
     client = QdrantClient(":memory:")
     model = Embedder()
@@ -565,15 +564,13 @@ def test_document_upload_rejects_invalid_and_oversized(api_client):
 
 
 def test_upload_chat_isolation_and_demo_end_to_end(tmp_path, monkeypatch):
-    import numpy as np
     from qdrant_client import QdrantClient, models
-    from sentence_transformers import SentenceTransformer
 
     from src.data_pipeline import retrieval
 
     class Embedder:
         def encode(self, sentences, **kwargs):
-            return np.array([[1.0] + [0.0] * 383 for _ in sentences])
+            return [[1.0] + [0.0] * 383 for _ in sentences]
 
     class SharedClient:
         def __init__(self, client):
@@ -607,18 +604,32 @@ def test_upload_chat_isolation_and_demo_end_to_end(tmp_path, monkeypatch):
         ],
     )
     monkeypatch.setenv("GROQ_API_KEY", "test-only")
-    monkeypatch.setattr(retrieval, "get_client", lambda *args: SharedClient(db))
-    monkeypatch.setattr(retrieval, "load_embedder", lambda: Embedder())
     monkeypatch.setattr(
-        SentenceTransformer, "__new__", lambda cls, *args, **kwargs: Embedder()
+        retrieval, "get_client", lambda *args, **kwargs: SharedClient(db)
     )
-    monkeypatch.setattr("src.api.dependencies.GroqLLM", lambda *args: SimulatedLLM())
+    monkeypatch.setattr(retrieval, "load_embedder", lambda: Embedder())
+    llms = []
+
+    def make_llm(*args):
+        llm = SimulatedLLM()
+        llms.append(llm)
+        return llm
+
+    monkeypatch.setattr("src.api.dependencies.GroqLLM", make_llm)
     app = create_app(db_path=tmp_path / "test.db")
     with TestClient(app) as a, TestClient(app) as b:
         _create_session(a)
         _create_session(b)
+        empty = a.post(
+            "/chat/query", json={"question": "Qual é o prazo?", "scope": "private"}
+        )
+        assert empty.status_code == 200 and empty.json()["abstained"]
+        assert empty.json()["llm_calls"] == 0 and llms[-1].calls == []
         for client, text in [
-            (a, "O prazo exclusivo da sessão A é segunda-feira."),
+            (
+                a,
+                "O prazo exclusivo da sessão A é segunda-feira. CPF 123.456.789-09 email teste@example.com telefone (11) 99999-8888.",
+            ),
             (b, "O prazo exclusivo da sessão B é sexta-feira."),
         ]:
             response = client.post(
@@ -626,6 +637,27 @@ def test_upload_chat_isolation_and_demo_end_to_end(tmp_path, monkeypatch):
                 files={"file": ("prazo.txt", text.encode(), "text/plain")},
             )
             assert response.status_code == 201, response.text
+            if client is a:
+                empty_b = b.post(
+                    "/chat/query",
+                    json={"question": "Qual é o prazo?", "scope": "private"},
+                )
+                assert empty_b.status_code == 200 and empty_b.json()["abstained"]
+                assert empty_b.json()["llm_calls"] == 0 and llms[-1].calls == []
+                assert b.get("/documents").json() == []
+                points, _ = db.scroll("vezo_user_private", with_payload=True)
+                payload_text = str(points[0].payload["text"])
+                for secret in (
+                    "123.456.789-09",
+                    "teste@example.com",
+                    "(11) 99999-8888",
+                ):
+                    assert secret not in payload_text
+                assert (
+                    "[CPF_REMOVIDO]" in payload_text
+                    and "[EMAIL_REMOVIDO]" in payload_text
+                    and "[TELEFONE_REMOVIDO]" in payload_text
+                )
         assert [x["filename"] for x in a.get("/documents").json()] == ["prazo.txt"]
         for client, expected, forbidden in [
             (a, "segunda-feira", "sexta-feira"),
@@ -645,3 +677,15 @@ def test_upload_chat_isolation_and_demo_end_to_end(tmp_path, monkeypatch):
         assert "[C1: demo.txt]" in demo.json()["answer"]
         assert "institucional" in demo.json()["answer"]
     db.close()
+
+
+def test_qdrant_local_does_not_create_directory_on_read(tmp_path):
+    from src.data_pipeline.retrieval import get_client
+
+    path = tmp_path / "new-qdrant"
+    with pytest.raises(FileNotFoundError):
+        get_client(path)
+    assert not path.exists()
+    client = get_client(path, create_if_missing=True)
+    client.close()
+    assert path.is_dir()

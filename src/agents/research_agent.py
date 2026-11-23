@@ -31,8 +31,19 @@ class QdrantRetriever:
         self.user_id = user_id
         if self.collection == "vezo_user_private" and not user_id:
             raise ValueError("Sessão obrigatória para consulta privada")
-        self.client = get_client(local_path)
         try:
+            self.client = get_client(local_path)
+        except FileNotFoundError:
+            if self.collection != "vezo_user_private":
+                raise
+            self.client = None
+            return
+        try:
+            if (
+                self.collection == "vezo_user_private"
+                and not self.client.collection_exists(self.collection)
+            ):
+                return
             info = self.client.get_collection(self.collection)
             vectors = info.config.params.vectors
             if (
@@ -51,6 +62,15 @@ class QdrantRetriever:
     def retrieve(self, question):
         from src.data_pipeline.retrieval import search
 
+        if self.client is None or (
+            self.collection == "vezo_user_private"
+            and not self.client.collection_exists(self.collection)
+        ):
+            return []
+        if not hasattr(self, "model"):
+            from src.data_pipeline.retrieval import load_embedder
+
+            self.model = load_embedder()
         hits = search(
             self.client,
             self.model,
@@ -75,7 +95,8 @@ class QdrantRetriever:
         ]
 
     def close(self):
-        self.client.close()
+        if self.client is not None:
+            self.client.close()
 
 
 class ResearchAgent:

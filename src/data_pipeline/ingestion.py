@@ -312,23 +312,23 @@ def _criar_cliente_qdrant(qdrant_url: str | None = None) -> QdrantClient:
 
 
 def _buscar_pontos_existentes(
-    cliente: QdrantClient, collection_name: str, source_key: str, user_id: str
+    cliente: QdrantClient,
+    collection_name: str,
+    source_key: str,
+    user_id: str | None = None,
 ) -> list[Any]:
     from qdrant_client import models
 
     pontos: list[Any] = []
     offset: Any = None
-    filtro = models.Filter(
-        must=[
-            models.FieldCondition(
-                key="source",
-                match=models.MatchValue(value=source_key),
-            ),
-            models.FieldCondition(
-                key="user_id", match=models.MatchValue(value=user_id)
-            ),
-        ]
-    )
+    conditions: list[Any] = [
+        models.FieldCondition(key="source", match=models.MatchValue(value=source_key))
+    ]
+    if user_id is not None:
+        conditions.append(
+            models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+        )
+    filtro = models.Filter(must=conditions)
     while True:
         batch, next_offset = cliente.scroll(
             collection_name=collection_name,

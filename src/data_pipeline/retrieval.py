@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
@@ -72,7 +73,9 @@ def expected_rank(
     return None
 
 
-def get_client(local_path: Path | str | None = None) -> QdrantClient:
+def get_client(
+    local_path: Path | str | None = None, *, create_if_missing: bool = False
+) -> QdrantClient:
     """Servidor se QDRANT_URL estiver definido; senão, o Qdrant local em disco.
 
     Atenção: no modo local só um processo abre a pasta por vez. Rode a demo
@@ -84,10 +87,14 @@ def get_client(local_path: Path | str | None = None) -> QdrantClient:
     if url:
         return QdrantClient(url=url, api_key=os.getenv("QDRANT_API_KEY"))
     path = Path(local_path or DEFAULT_LOCAL_PATH)
-    path.mkdir(parents=True, exist_ok=True)
+    if not path.is_dir():
+        if not create_if_missing:
+            raise FileNotFoundError(f"Base vetorial local não encontrada em {path}.")
+        path.mkdir(parents=True, exist_ok=True)
     return QdrantClient(path=str(path))
 
 
+@lru_cache(maxsize=1)
 def load_embedder(model_name: str = EMBEDDING_MODEL) -> Embedder:
     from sentence_transformers import SentenceTransformer
 

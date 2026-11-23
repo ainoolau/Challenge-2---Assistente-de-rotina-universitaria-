@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 
@@ -61,10 +61,6 @@ SessionDep = Annotated[SessionRecord, Depends(require_session)]
 class DefaultOrchestratorManager:
     """Inicialização tardia e segura de QdrantRetriever + GroqLLM para /chat/query."""
 
-    def __init__(self) -> None:
-        self._retriever: Any = None
-        self._orchestrator: MultiAgentOrchestrator | None = None
-
     def get(
         self, scope: str = "demo", user_id: str | None = None
     ) -> MultiAgentOrchestrator:
@@ -102,7 +98,4 @@ class DefaultOrchestratorManager:
         return orchestrator
 
     def close(self) -> None:
-        if self._retriever is not None:
-            self._retriever.close()
-            self._retriever = None
-        self._orchestrator = None
+        """Os clientes são fechados ao final de cada consulta."""

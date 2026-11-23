@@ -58,6 +58,8 @@ from .schemas import (
     ChatQueryRequest,
     ChatQueryResponse,
     CitationItem,
+    DocumentItem,
+    DocumentUploadResponse,
     HealthResponse,
     OptimizeScheduleRequest,
     PreferencesUpdateRequest,
@@ -726,12 +728,17 @@ def create_app(
     # 4. CHAT MULTIAGENTES & HISTÓRICO (TASK-F4-04 #68)
     # =========================================================================
 
-    @app.post("/documents/upload", tags=["documents"], status_code=201)
+    @app.post(
+        "/documents/upload",
+        tags=["documents"],
+        status_code=201,
+        response_model=DocumentUploadResponse,
+    )
     async def upload_document(
         session: SessionDep, file: Annotated[UploadFile, File()]
-    ) -> dict[str, Any]:
+    ) -> DocumentUploadResponse:
         from src.data_pipeline.ingestion import ingest_files
-        from src.data_pipeline.retrieval import get_client
+        from src.data_pipeline.retrieval import get_client, load_embedder
 
         filename = Path((file.filename or "").replace("\\", "/")).name
         if not filename or Path(filename).suffix.lower() not in {
@@ -757,8 +764,9 @@ def create_app(
             if not size:
                 raise HTTPException(status_code=400, detail="Arquivo vazio.")
             try:
-                client = get_client()
+                client = get_client(create_if_missing=True)
                 try:
+                    embedder = await run_in_threadpool(load_embedder)
                     summary = await run_in_threadpool(
                         ingest_files,
                         [path],
@@ -767,9 +775,14 @@ def create_app(
                         corpus_scope="private",
                         target_collection_scope="private",
                         client=client,
+                        embedder=embedder,
                     )
                 finally:
                     client.close()
+            except PermissionError as exc:
+                raise HTTPException(
+                    status_code=403, detail="Operação de ingestão não permitida."
+                ) from exc
             except Exception as exc:
                 raise HTTPException(
                     status_code=503, detail="Serviço de ingestão indisponível."
@@ -780,14 +793,14 @@ def create_app(
                 raise HTTPException(
                     status_code=422, detail="Não foi possível extrair texto do arquivo."
                 )
-            return {
-                "filename": filename,
-                "chunks": summary.total_chunks_upserted,
-                "unchanged": bool(summary.skipped_unchanged),
-            }
+            return DocumentUploadResponse(
+                filename=filename,
+                chunks=summary.total_chunks_upserted,
+                unchanged=bool(summary.skipped_unchanged),
+            )
 
-    @app.get("/documents", tags=["documents"])
-    def list_documents(session: SessionDep) -> list[dict[str, Any]]:
+    @app.get("/documents", tags=["documents"], response_model=list[DocumentItem])
+    def list_documents(session: SessionDep) -> list[DocumentItem]:
         from qdrant_client import models
 
         from src.data_pipeline.retrieval import get_client
@@ -798,7 +811,7 @@ def create_app(
                 if not client.collection_exists("vezo_user_private"):
                     return []
                 offset = None
-                documents: dict[str, dict[str, Any]] = {}
+                documents: dict[str, DocumentItem] = {}
                 while True:
                     points, offset = client.scroll(
                         collection_name="vezo_user_private",
@@ -822,15 +835,16 @@ def create_app(
                     for point in points:
                         payload = point.payload or {}
                         source = str(payload.get("source", ""))
-                        documents[source] = {
-                            "filename": source,
-                            "created_at": payload.get("created_at"),
-                        }
+                        documents[source] = DocumentItem(
+                            filename=source, created_at=payload.get("created_at")
+                        )
                     if offset is None:
                         break
                 return list(documents.values())
             finally:
                 client.close()
+        except FileNotFoundError:
+            return []
         except Exception as exc:
             raise HTTPException(
                 status_code=503, detail="Base de documentos indisponível."
