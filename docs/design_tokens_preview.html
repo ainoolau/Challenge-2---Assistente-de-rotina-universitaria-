@@ -4,6 +4,330 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vezo — Design Tokens &amp; Identidade Visual (TASK-F1-03)</title>
+  <!-- Fallback embutido para abertura direta via file:// (Safari/Finder bloqueia CSS em ../) -->
+  <style id="vezo-tokens-fallback">
+/**
+ * Vezo Design Tokens — Fonte Única de Verdade Visual (TASK-F1-03 / #46)
+ *
+ * Referência oficial da marca: Guia de Identidade Visual Vezo (anexado à Issue/PR #46)
+ * Documentação completa e matriz WCAG AA: docs/DESIGN.md
+ *
+ * Regras obrigatórias:
+ * - Nunca usar códigos hexadecimais hardcoded nos componentes; consumir apenas tokens semânticos.
+ * - Proibido usar gradientes genéricos roxo-para-azul, bolhas decorativas ou efeitos glow/neon.
+ * - Manter distinção visual inequívoca entre compromisso fixo, sono protegido e proposta pendente.
+ * - Todos os pares texto/fundo e controles validados em WCAG AA (>= 4.5:1 texto; >= 3:1 UI/bordas).
+ */
+
+:root {
+  /* =========================================================================
+   * 1. PRIMITIVOS OFICIAIS DA MARCA VEZO (Identidade Visual Oficial)
+   *    (Uso interno: não referenciar diretamente em componentes; usar tokens semânticos abaixo.)
+   * ========================================================================= */
+  --vezo-ocean: #094D60;            /* Azul-Oceano */
+  --vezo-turquoise: #25CBC1;        /* Turquesa Vibrante */
+  --vezo-leaf: #94E09F;             /* Verde-Folha Claro */
+  --vezo-mint: #75D0A4;             /* Verde-Menta */
+  --vezo-butter: #FCEC95;           /* Amarelo-Pastel */
+  --vezo-ink-dark: #101C1C;         /* Fundo escuro profundo da marca */
+  --vezo-surface-dark: #1B2A2F;     /* Superfície escura da marca */
+  --vezo-surface-elevated: #27373D; /* Superfície elevada escura da marca */
+
+  /* =========================================================================
+   * 2. TIPOGRAFIA, ESPAÇAMENTO, RAIOS E ACESSIBILIDADE (MOBILE >= 360px / DESKTOP >= 1024px)
+   * ========================================================================= */
+  --font-sans: "Inter", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Escala tipográfica (rem — respeita preferências do usuário) */
+  --text-xs: 0.75rem;      /* 12px — metadados, timestamps, badges compactos */
+  --text-sm: 0.875rem;     /* 14px — labels, corpo secundário, itens de agenda */
+  --text-base: 1rem;       /* 16px — corpo padrão, mensagens de chat, inputs */
+  --text-lg: 1.125rem;     /* 18px — subtítulos de painel e títulos de card */
+  --text-xl: 1.25rem;      /* 20px — cabeçalhos de seção */
+  --text-2xl: 1.5rem;      /* 24px — título de tela (mobile) */
+  --text-3xl: 1.875rem;    /* 30px — título de tela (desktop) */
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Escala de espaçamento (base 4px) */
+  --space-1: 0.25rem;      /* 4px */
+  --space-2: 0.5rem;       /* 8px */
+  --space-3: 0.75rem;      /* 12px */
+  --space-4: 1rem;         /* 16px */
+  --space-5: 1.25rem;      /* 20px */
+  --space-6: 1.5rem;       /* 24px */
+  --space-8: 2rem;         /* 32px */
+  --space-10: 2.5rem;      /* 40px */
+  --space-12: 3rem;        /* 48px */
+
+  /* Bordas, raios sóbrios e sombras discretas (sem glow/neon) */
+  --border-width: 1px;
+  --radius-sm: 0.375rem;   /* 6px — badges, chips compactos */
+  --radius-md: 0.5rem;     /* 8px — inputs, botões, blocos de agenda */
+  --radius: 0.625rem;      /* 10px — padrão shadcn/ui (cards, painéis) */
+  --radius-lg: 0.75rem;    /* 12px — modais e drawers */
+  --radius-full: 9999px;   /* pílulas de status */
+
+  --shadow-xs: 0 1px 2px 0 rgba(16, 28, 28, 0.05);
+  --shadow-sm: 0 2px 6px -1px rgba(16, 28, 28, 0.07), 0 1px 2px -1px rgba(16, 28, 28, 0.04);
+  --shadow-md: 0 8px 20px -4px rgba(16, 28, 28, 0.10), 0 2px 6px -2px rgba(16, 28, 28, 0.05);
+
+  /* Alvos de toque e layout responsivo */
+  --touch-target-min: 44px;
+  --breakpoint-mobile-min: 360px;
+  --breakpoint-desktop: 1024px;
+
+  /* =========================================================================
+   * 3. TOKENS SEMÂNTICOS BASE (MODO CLARO — PADRÃO)
+   * ========================================================================= */
+  --background: #F6FAFA;
+  --foreground: #101C1C;
+
+  --card: #FFFFFF;
+  --card-foreground: #101C1C;
+
+  --popover: #FFFFFF;
+  --popover-foreground: #101C1C;
+
+  --primary: #094D60;                 /* Azul-Oceano */
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #EBF3F4;
+  --secondary-foreground: #101C1C;
+
+  --muted: #EDF4F4;
+  --muted-foreground: #42585E;
+
+  --accent: #E1F6F5;                  /* Tint suave do Turquesa Vibrante */
+  --accent-foreground: #094D60;
+
+  --border: #C5D7DA;
+  --input: #738F96;                   /* Contraste 3.44:1 sobre #FFFFFF */
+  --ring: #094D60;
+
+  /* Estados semânticos: Destructive, Warning e Success */
+  --destructive: #B91C1C;
+  --destructive-foreground: #FFFFFF;
+  --destructive-subtle: #FEF2F2;
+  --destructive-subtle-foreground: #991B1B;
+
+  --warning: #9A6700;
+  --warning-foreground: #FFFFFF;
+  --warning-subtle: #FEFBE6;
+  --warning-subtle-foreground: #6B4700;
+  --warning-accent: #FCEC95;          /* Amarelo-Pastel oficial (usar com texto #101C1C) */
+  --warning-accent-foreground: #101C1C;
+
+  --success: #176B45;
+  --success-foreground: #FFFFFF;
+  --success-subtle: #ECFDF3;
+  --success-subtle-foreground: #135336;
+
+  /* =========================================================================
+   * 4. TOKENS SEMÂNTICOS DE DOMÍNIO — AGENDA VEZO (MODO CLARO)
+   * ========================================================================= */
+
+  /* Aulas (ScheduleSlot.kind = "class"): bloco sólido com barra lateral primária */
+  --slot-class: #094D60;
+  --slot-class-bg: #E7F4F7;
+  --slot-class-fg: #083D4C;
+  --slot-class-border: #094D60;
+
+  /* Trabalho / Residência (ScheduleSlot.kind = "work"): bloco sólido neutro estruturado */
+  --slot-work: #42585E;
+  --slot-work-bg: #EEF2F3;
+  --slot-work-fg: #1B2A2F;
+  --slot-work-border: #42585E;
+
+  /* Deslocamento (ScheduleSlot.kind = "commute"): faixa compacta e discreta */
+  --slot-commute: #7A9399;
+  --slot-commute-bg: #F4F7F7;
+  --slot-commute-fg: #374B50;
+  --slot-commute-border: #7A9399;
+
+  /* Sono protegido (ScheduleSlot.kind = "sleep"): faixa suave hachurada + bloqueio */
+  --slot-sleep: #617B82;
+  --slot-sleep-bg: #E9EFF1;
+  --slot-sleep-stripe: #DCE6E9;
+  --slot-sleep-fg: #2B4046;
+  --slot-sleep-border: #617B82;
+
+  /* Conflito pré-existente (input_conflicts): borda de alerta + badge "Conflito" */
+  --slot-conflict: #B91C1C;
+  --slot-conflict-bg: #FEF2F2;
+  --slot-conflict-fg: #991B1B;
+  --slot-conflict-border: #B91C1C;
+
+  /* Estudo proposto pela IA (ProposedBlock): BORDA TRACEJADA + badge "Proposta" */
+  --slot-study-proposed: #0E7A74;
+  --slot-study-proposed-bg: #E5F9F7;
+  --slot-study-proposed-fg: #094D60;
+  --slot-study-proposed-border: #0E7A74;
+
+  /* Estudo confirmado (após confirmação explícita): bloco sólido verde-menta */
+  --slot-study-confirmed: #1F7A52;
+  --slot-study-confirmed-bg: #E9F8F0;
+  --slot-study-confirmed-fg: #135336;
+  --slot-study-confirmed-border: #1F7A52;
+}
+
+/* ===========================================================================
+ * 5. MODO ESCURO (.dark — ANCORADO NAS SUPERFÍCIES OFICIAIS DA MARCA VEZO)
+ * =========================================================================== */
+.dark {
+  --background: #101C1C;              /* Fundo escuro oficial da marca */
+  --foreground: #F0F7F7;
+
+  --card: #1B2A2F;                    /* Superfície escura oficial da marca */
+  --card-foreground: #F0F7F7;
+
+  --popover: #1B2A2F;
+  --popover-foreground: #F0F7F7;
+
+  --primary: #25CBC1;                 /* Turquesa Vibrante oficial */
+  --primary-foreground: #072226;
+
+  --secondary: #27373D;               /* Superfície elevada oficial da marca */
+  --secondary-foreground: #E6F2F2;
+
+  --muted: #1F3036;
+  --muted-foreground: #9FB7BC;
+
+  --accent: #123C47;
+  --accent-foreground: #94E09F;       /* Verde-Folha Claro oficial */
+
+  --border: #324950;
+  --input: #607F87;                   /* Contraste 3.44:1 sobre #1B2A2F */
+  --ring: #25CBC1;
+
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.25);
+  --shadow-sm: 0 2px 6px -1px rgba(0, 0, 0, 0.35), 0 1px 2px -1px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 10px 24px -4px rgba(0, 0, 0, 0.45), 0 4px 8px -2px rgba(0, 0, 0, 0.30);
+
+  /* Estados semânticos (Escuro) */
+  --destructive: #F87171;
+  --destructive-foreground: #3B0808;
+  --destructive-subtle: #2E1518;
+  --destructive-subtle-foreground: #FCA5A5;
+
+  --warning: #FCEC95;                 /* Amarelo-Pastel oficial */
+  --warning-foreground: #101C1C;
+  --warning-subtle: #2C2814;
+  --warning-subtle-foreground: #FCEC95;
+  --warning-accent: #FCEC95;
+  --warning-accent-foreground: #101C1C;
+
+  --success: #75D0A4;                 /* Verde-Menta oficial */
+  --success-foreground: #0B2419;
+  --success-subtle: #132E24;
+  --success-subtle-foreground: #94E09F; /* Verde-Folha Claro oficial */
+
+  /* Tokens semânticos de domínio — Agenda Vezo (Escuro) */
+  --slot-class: #25CBC1;
+  --slot-class-bg: #0D3644;
+  --slot-class-fg: #D8F6F8;
+  --slot-class-border: #25CBC1;
+
+  --slot-work: #6F8B92;
+  --slot-work-bg: #23343A;
+  --slot-work-fg: #E6F2F2;
+  --slot-work-border: #6F8B92;
+
+  --slot-commute: #5A757D;
+  --slot-commute-bg: #18262B;
+  --slot-commute-fg: #BDD0D4;
+  --slot-commute-border: #5A757D;
+
+  --slot-sleep: #5D7980;
+  --slot-sleep-bg: #162328;
+  --slot-sleep-stripe: #1E2E34;
+  --slot-sleep-fg: #B8CDD1;
+  --slot-sleep-border: #5D7980;
+
+  --slot-conflict: #F87171;
+  --slot-conflict-bg: #2E1518;
+  --slot-conflict-fg: #FCA5A5;
+  --slot-conflict-border: #F87171;
+
+  --slot-study-proposed: #25CBC1;
+  --slot-study-proposed-bg: #113335;
+  --slot-study-proposed-fg: #75ECE4;
+  --slot-study-proposed-border: #25CBC1;
+
+  --slot-study-confirmed: #75D0A4;
+  --slot-study-confirmed-bg: #143025;
+  --slot-study-confirmed-fg: #94E09F;
+  --slot-study-confirmed-border: #75D0A4;
+}
+
+/* ===========================================================================
+ * 6. PADRÕES VISUAIS REUTILIZÁVEIS DOS BLOCOS DE AGENDA
+ *    Garantem separação visual inequívoca (fixo vs. sono vs. proposta vs. conflito)
+ * =========================================================================== */
+.vezo-slot-class {
+  background-color: var(--slot-class-bg);
+  color: var(--slot-class-fg);
+  border: var(--border-width) solid var(--border);
+  border-left: 4px solid var(--slot-class-border);
+  border-radius: var(--radius-md);
+}
+
+.vezo-slot-work {
+  background-color: var(--slot-work-bg);
+  color: var(--slot-work-fg);
+  border: var(--border-width) solid var(--border);
+  border-left: 4px solid var(--slot-work-border);
+  border-radius: var(--radius-md);
+}
+
+.vezo-slot-commute {
+  background-color: var(--slot-commute-bg);
+  color: var(--slot-commute-fg);
+  border: var(--border-width) solid var(--slot-commute-border);
+  border-radius: var(--radius-sm);
+}
+
+.vezo-slot-sleep {
+  background-color: var(--slot-sleep-bg);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--slot-sleep-bg),
+    var(--slot-sleep-bg) 8px,
+    var(--slot-sleep-stripe) 8px,
+    var(--slot-sleep-stripe) 16px
+  );
+  color: var(--slot-sleep-fg);
+  border: var(--border-width) solid var(--slot-sleep-border);
+  border-radius: var(--radius-md);
+}
+
+.vezo-slot-conflict {
+  background-color: var(--slot-conflict-bg);
+  color: var(--slot-conflict-fg);
+  border: 1.5px solid var(--slot-conflict-border);
+  border-left: 4px solid var(--slot-conflict-border);
+  border-radius: var(--radius-md);
+}
+
+.vezo-slot-study-proposed {
+  background-color: var(--slot-study-proposed-bg);
+  color: var(--slot-study-proposed-fg);
+  border: 2px dashed var(--slot-study-proposed-border);
+  border-radius: var(--radius-md);
+}
+
+.vezo-slot-study-confirmed {
+  background-color: var(--slot-study-confirmed-bg);
+  color: var(--slot-study-confirmed-fg);
+  border: var(--border-width) solid var(--slot-study-confirmed-border);
+  border-left: 4px solid var(--slot-study-confirmed-border);
+  border-radius: var(--radius-md);
+}
+  </style>
+  <!-- Sobrescreve dinamicamente com a fonte oficial quando servido via HTTP -->
   <link rel="stylesheet" href="../frontend/src/styles/tokens.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; }
