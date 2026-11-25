@@ -93,11 +93,11 @@ type BannerFeedback = {
  */
 export function DashboardView() {
   return (
-    <div className="grid flex-1 gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,38%)] lg:gap-0 lg:p-0">
+    <div className="grid flex-1 grid-cols-1 gap-6 px-3.5 py-5 sm:px-4 sm:py-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,38%)] lg:gap-0 lg:p-0">
       <RoutinePanel />
       <aside
         aria-label="Assistente"
-        className="hidden border-l bg-card lg:block lg:px-6 lg:py-8"
+        className="hidden min-w-0 border-l bg-card lg:block lg:px-6 lg:py-8"
       >
         <div className="sticky top-24">
           <ChatPanel />
@@ -112,7 +112,10 @@ function RoutinePanel() {
   const todayFormatted = useTodayLabel();
 
   return (
-    <section aria-labelledby="rotina-titulo" className="flex flex-col gap-5 lg:px-8 lg:py-8">
+    <section
+      aria-labelledby="rotina-titulo"
+      className="flex min-w-0 flex-col gap-4 sm:gap-5 lg:px-8 lg:py-8"
+    >
       <header className="flex flex-col gap-1">
         <h1 id="rotina-titulo" className="text-2xl font-semibold lg:text-3xl">
           Sua rotina
@@ -456,10 +459,10 @@ function AuthenticatedRoutine({
   const monthGrid = getMonthGridKeys(anchorDateKey);
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Barra de ações rápidas + versão da agenda */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
+    <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+      {/* Barra de ações rápidas + resumo da agenda */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="outline" className="font-mono">
             Agenda v{schedule.schedule_version}
           </Badge>
@@ -469,12 +472,13 @@ function AuthenticatedRoutine({
           {schedule.free_windows.length > 0 ? (
             <Badge variant="outline">
               <Clock aria-hidden />
-              {schedule.free_windows.length} janelas livres
+              {schedule.free_windows.length}{" "}
+              {schedule.free_windows.length === 1 ? "janela livre" : "janelas livres"}
             </Badge>
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <Button
             type="button"
             variant="outline"
@@ -482,17 +486,19 @@ function AuthenticatedRoutine({
             onClick={triggerReload}
             disabled={loadingSchedule}
             aria-label="Atualizar agenda"
+            className="shrink-0"
           >
             <RefreshCw aria-hidden className={cn(loadingSchedule && "animate-spin")} />
-            Atualizar
+            <span>Atualizar</span>
           </Button>
           <Button
             type="button"
             size="sm"
             onClick={() => openCreateDialog(anchorDateKey)}
+            className="flex-1 sm:flex-none"
           >
             <Plus aria-hidden />
-            Compromisso
+            Novo compromisso
           </Button>
         </div>
       </div>
@@ -506,12 +512,13 @@ function AuthenticatedRoutine({
             <AlertTriangle aria-hidden />
           )}
           <AlertTitle>{feedback.title}</AlertTitle>
-          <AlertDescription className="flex items-start justify-between gap-2">
-            <span>{feedback.description}</span>
+          <AlertDescription className="flex min-w-0 items-start justify-between gap-2">
+            <span className="min-w-0 break-words">{feedback.description}</span>
             <Button
               type="button"
               variant="ghost"
               size="icon-xs"
+              className="shrink-0"
               onClick={() => setFeedback(null)}
               aria-label="Fechar aviso"
             >
@@ -533,18 +540,20 @@ function AuthenticatedRoutine({
               ? "1 conflito entre compromissos fixos detectado"
               : `${conflicts.length} conflitos entre compromissos fixos detectados`}
           </AlertTitle>
-          <AlertDescription className="flex flex-col gap-3">
-            <p>
+          <AlertDescription className="flex min-w-0 flex-col gap-3">
+            <p className="break-words">
               O Vezo <strong>nunca move compromissos fixos sozinho</strong>. Revise os horários
               sobrepostos abaixo, converse com o assistente ou rebalanceie seus blocos flexíveis:
             </p>
             <ul className="list-disc space-y-1 pl-4 text-xs">
               {conflicts.map((msg, idx) => (
-                <li key={idx}>{msg}</li>
+                <li key={idx} className="break-words">
+                  {msg}
+                </li>
               ))}
             </ul>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm" variant="outline">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
                 <Link href="/chat">
                   <MessageSquareText aria-hidden />
                   Resolver no Assistente
@@ -554,6 +563,7 @@ function AuthenticatedRoutine({
                 type="button"
                 size="sm"
                 variant="secondary"
+                className="w-full sm:w-auto"
                 onClick={() => setReallocateOpen(true)}
               >
                 <Shuffle aria-hidden />
@@ -582,110 +592,204 @@ function AuthenticatedRoutine({
       <Tabs
         value={viewMode}
         onValueChange={(value) => setViewMode(value as RoutineViewMode)}
-        className="gap-4"
+        className="min-w-0 gap-3.5"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <TabsList aria-label="Período da agenda">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <TabsList
+            aria-label="Período da agenda"
+            className="grid w-full grid-cols-3 sm:inline-flex sm:w-fit"
+          >
             {VIEWS.map((view) => (
-              <TabsTrigger key={view.value} value={view.value} className="px-4">
+              <TabsTrigger key={view.value} value={view.value} className="px-3 sm:px-4">
                 {view.label}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center justify-between gap-2 sm:justify-end">
             <Button
               type="button"
               variant="outline"
               size="icon-sm"
               onClick={() => shiftPeriod(-1)}
               aria-label="Período anterior"
+              className="shrink-0"
             >
               <ChevronLeft aria-hidden />
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={jumpToToday}>
+
+            <span className="min-w-0 flex-1 truncate text-center text-sm font-medium capitalize text-foreground sm:hidden">
+              {viewMode === "semana"
+                ? `Semana ${weekRangeLabel}`
+                : viewMode === "mes"
+                  ? monthGrid.monthLabel
+                  : formatDayHeader(anchorDateKey).fullLabel}
+            </span>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={jumpToToday}
+              className="hidden shrink-0 sm:inline-flex"
+            >
               Hoje
             </Button>
+
             <Button
               type="button"
               variant="outline"
               size="icon-sm"
               onClick={() => shiftPeriod(1)}
               aria-label="Próximo período"
+              className="shrink-0"
             >
               <ChevronRight aria-hidden />
             </Button>
           </div>
         </div>
 
-        {/* Toggle de janelas livres (Hoje e Semana) */}
-        {viewMode !== "mes" ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">
+        {/* Subbarra: atalho Hoje (mobile) + período (desktop) + toggle de janelas livres */}
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={jumpToToday}
+            className="shrink-0 sm:hidden"
+          >
+            Ir para hoje
+          </Button>
+
+          {viewMode !== "mes" ? (
+            <span className="hidden font-medium capitalize text-foreground sm:inline">
               {viewMode === "semana"
                 ? `Semana ${weekRangeLabel}`
                 : formatDayHeader(anchorDateKey).fullLabel}
             </span>
-            <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-md border bg-card px-2.5 py-1 text-xs font-medium text-foreground">
+          ) : (
+            <span className="hidden sm:inline" />
+          )}
+
+          {viewMode !== "mes" ? (
+            <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border bg-card px-3 py-1 text-xs font-medium text-foreground select-none">
               <input
                 type="checkbox"
                 checked={showFreeWindows}
                 onChange={(e) => setShowFreeWindows(e.target.checked)}
                 className="size-4 accent-primary"
               />
-              Mostrar janelas livres
+              Janelas livres
             </label>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
 
         {/* ==================== VISÃO SEMANA ==================== */}
-        <TabsContent value="semana" className="flex flex-col gap-4">
-          {/* Filtro rápido por dia da semana (mobile-first) */}
-          <div
-            className="flex gap-1.5 overflow-x-auto pb-1"
-            role="group"
-            aria-label="Filtrar dia da semana"
-          >
-            <Button
-              type="button"
-              size="sm"
-              variant={focusedWeekDay === "all" ? "default" : "outline"}
-              onClick={() => setFocusedWeekDay("all")}
-              className="shrink-0"
-            >
-              Todos (7)
-            </Button>
-            {weekKeys.map((dayKey) => {
-              const header = formatDayHeader(dayKey);
-              const count =
-                (itemsByDay[dayKey]?.length ?? 0) + (proposedByDay[dayKey]?.length ?? 0);
-              const isToday = dayKey === todayKey;
-              return (
+        <TabsContent value="semana" className="flex min-w-0 flex-col gap-3.5">
+          {/* Seletor semanal de 7 dias em grade fixa (sem rolagem horizontal em telas móveis) */}
+          <div className="flex min-w-0 flex-col gap-2">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="text-muted-foreground">
+                {focusedWeekDay === "all"
+                  ? "Mostrando a semana toda · toque em um dia para filtrar"
+                  : `Filtrando ${formatDayHeader(focusedWeekDay).weekdayShort} · ${formatDayHeader(focusedWeekDay).dayMonth}`}
+              </span>
+              {focusedWeekDay !== "all" ? (
                 <Button
-                  key={dayKey}
                   type="button"
-                  size="sm"
-                  variant={focusedWeekDay === dayKey ? "default" : "outline"}
-                  onClick={() => setFocusedWeekDay(dayKey)}
-                  className="shrink-0 gap-1.5"
+                  variant="ghost"
+                  size="xs"
+                  className="shrink-0 text-primary"
+                  onClick={() => setFocusedWeekDay("all")}
                 >
-                  <span className="capitalize">{header.weekdayShort}</span>
-                  <span className="font-mono text-xs opacity-85">{header.dayNumber}</span>
-                  {count > 0 ? (
-                    <span className="rounded-full bg-background/25 px-1.5 font-mono text-[0.7rem]">
-                      {count}
-                    </span>
-                  ) : null}
-                  {isToday ? <span className="sr-only">(Hoje)</span> : null}
+                  Ver todos (7)
                 </Button>
-              );
-            })}
+              ) : null}
+            </div>
+
+            <div
+              className="grid grid-cols-7 gap-1 sm:gap-1.5"
+              role="group"
+              aria-label="Filtrar dia da semana"
+            >
+              {weekKeys.map((dayKey) => {
+                const header = formatDayHeader(dayKey);
+                const dayItems = itemsByDay[dayKey] ?? [];
+                const dayProposed = proposedByDay[dayKey] ?? [];
+                const count = dayItems.length + dayProposed.length;
+                const hasDayConflict = dayItems.some((item) => itemHasConflict(item, conflicts));
+                const isToday = dayKey === todayKey;
+                const isSelected = focusedWeekDay === dayKey;
+
+                return (
+                  <button
+                    key={dayKey}
+                    type="button"
+                    aria-pressed={isSelected}
+                    aria-label={`${header.weekdayShort} ${header.dayMonth}${isToday ? " (Hoje)" : ""}${count > 0 ? `, ${count} ${count === 1 ? "item" : "itens"}` : ""}`}
+                    onClick={() =>
+                      setFocusedWeekDay((prev) => (prev === dayKey ? "all" : dayKey))
+                    }
+                    className={cn(
+                      "flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border px-0.5 py-1.5 text-center transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+                      isSelected
+                        ? "border-primary bg-primary text-primary-foreground shadow-xs"
+                        : isToday
+                          ? "border-primary/70 bg-accent/60 text-foreground hover:bg-accent"
+                          : "border-border bg-card text-foreground hover:bg-muted",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "truncate text-[0.68rem] font-medium capitalize leading-none sm:text-xs",
+                        isSelected ? "text-primary-foreground/85" : "text-muted-foreground",
+                      )}
+                    >
+                      {header.weekdayShort.slice(0, 3)}
+                    </span>
+                    <span className="font-mono text-xs font-semibold leading-tight tabular-nums sm:text-sm">
+                      {header.dayNumber}
+                    </span>
+                    <span className="flex h-3 items-center justify-center gap-0.5">
+                      {hasDayConflict ? (
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "size-1.5 rounded-full",
+                            isSelected ? "bg-primary-foreground" : "bg-destructive",
+                          )}
+                        />
+                      ) : count > 0 ? (
+                        <span
+                          className={cn(
+                            "rounded-full px-1 font-mono text-[0.625rem] leading-none font-semibold",
+                            isSelected
+                              ? "bg-primary-foreground/20 text-primary-foreground"
+                              : "bg-primary/15 text-primary",
+                          )}
+                        >
+                          {count}
+                        </span>
+                      ) : isToday ? (
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "size-1.5 rounded-full",
+                            isSelected ? "bg-primary-foreground" : "bg-primary",
+                          )}
+                        />
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Grade semanal de cartões responsivos */}
           <div
             className={cn(
-              "grid gap-3",
+              "grid min-w-0 gap-3",
               focusedWeekDay === "all" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1",
             )}
           >
@@ -704,19 +808,22 @@ function AuthenticatedRoutine({
               return (
                 <Card
                   key={dayKey}
-                  className={cn(isToday && "border-primary/60 ring-1 ring-primary/20")}
+                  className={cn(
+                    "min-w-0 [--card-spacing:--spacing(3.5)] sm:[--card-spacing:--spacing(4)]",
+                    isToday && "border-primary/60 ring-1 ring-primary/20",
+                  )}
                 >
                   <CardHeader className="pb-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-sm font-semibold capitalize">
+                    <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <CardTitle className="truncate text-sm font-semibold capitalize">
                           {header.weekdayShort} ·{" "}
                           <span className="font-mono">{header.dayMonth}</span>
                         </CardTitle>
                         {isToday ? <Badge variant="default">Hoje</Badge> : null}
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex shrink-0 items-center gap-1.5">
                         <Badge variant={load.badgeVariant}>{load.label}</Badge>
                         <Button
                           type="button"
@@ -731,7 +838,7 @@ function AuthenticatedRoutine({
                     </div>
                   </CardHeader>
 
-                  <CardContent className="flex flex-col gap-2">
+                  <CardContent className="flex min-w-0 flex-col gap-2">
                     {dayItems.map((item) => (
                       <ScheduleSlotCard
                         key={item.item_id}
@@ -757,7 +864,7 @@ function AuthenticatedRoutine({
                     ) : null}
 
                     {showFreeWindows && dayFree.length > 0 ? (
-                      <div className="flex flex-col gap-1.5 pt-1">
+                      <div className="flex min-w-0 flex-col gap-1.5 pt-1">
                         {dayFree.map((win, idx) => (
                           <FreeWindowCard
                             key={`${dayKey}-fw-${idx}`}
@@ -780,7 +887,7 @@ function AuthenticatedRoutine({
         </TabsContent>
 
         {/* ==================== VISÃO HOJE ==================== */}
-        <TabsContent value="hoje" className="flex flex-col gap-3">
+        <TabsContent value="hoje" className="flex min-w-0 flex-col gap-3">
           {(() => {
             const dayItems = itemsByDay[anchorDateKey] ?? [];
             const dayProposed = proposedByDay[anchorDateKey] ?? [];
@@ -792,17 +899,17 @@ function AuthenticatedRoutine({
             const load = getDayLoad(totalMins);
 
             return (
-              <Card>
+              <Card className="min-w-0 [--card-spacing:--spacing(3.5)] sm:[--card-spacing:--spacing(4)]">
                 <CardHeader className="pb-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <CardTitle className="text-base capitalize">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                    <CardTitle className="min-w-0 break-words text-base capitalize">
                       {formatDayHeader(anchorDateKey).fullLabel}
                     </CardTitle>
                     <Badge variant={load.badgeVariant}>{load.label}</Badge>
                   </div>
                 </CardHeader>
 
-                <CardContent className="flex flex-col gap-2.5">
+                <CardContent className="flex min-w-0 flex-col gap-2.5">
                   {dayItems.length === 0 && dayProposed.length === 0 ? (
                     <EmptyState
                       icon={CalendarDays}
@@ -839,7 +946,7 @@ function AuthenticatedRoutine({
                   ))}
 
                   {showFreeWindows && dayFree.length > 0 ? (
-                    <div className="flex flex-col gap-1.5 pt-2">
+                    <div className="flex min-w-0 flex-col gap-1.5 pt-2">
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Janelas livres reais (motor determinístico)
                       </p>
@@ -864,20 +971,20 @@ function AuthenticatedRoutine({
         </TabsContent>
 
         {/* ==================== VISÃO MÊS ==================== */}
-        <TabsContent value="mes" className="flex flex-col gap-3">
-          <Card>
+        <TabsContent value="mes" className="flex min-w-0 flex-col gap-3">
+          <Card className="min-w-0 [--card-spacing:--spacing(3.5)] sm:[--card-spacing:--spacing(4)]">
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-base capitalize">{monthGrid.monthLabel}</CardTitle>
                 <span className="text-xs text-muted-foreground">
-                  Toque em um dia para abrir a timeline detalhada
+                  Toque em um dia para ver os detalhes
                 </span>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-muted-foreground">
+            <CardContent className="px-2 sm:px-(--card-spacing)">
+              <div className="grid grid-cols-7 gap-1 text-center text-[0.7rem] font-semibold text-muted-foreground sm:text-xs">
                 {WEEKDAY_HEADERS.map((label) => (
-                  <div key={label} className="py-1">
+                  <div key={label} className="min-w-0 truncate py-1">
                     {label}
                   </div>
                 ))}
@@ -902,29 +1009,29 @@ function AuthenticatedRoutine({
                         setViewMode("hoje");
                       }}
                       className={cn(
-                        "flex min-h-14 flex-col items-start justify-between rounded-md border p-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring",
+                        "flex min-h-12 min-w-0 flex-col items-center justify-between rounded-md border p-1 text-center transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring sm:min-h-14 sm:items-start sm:p-1.5 sm:text-left",
                         !inMonth && "opacity-45",
                         isToday && "border-primary bg-accent/50",
                         hasDayConflict && "border-destructive",
                       )}
                     >
-                      <span className="font-mono text-xs font-semibold">
+                      <span className="font-mono text-xs font-semibold tabular-nums">
                         {dayKey.slice(8, 10)}
                       </span>
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex max-w-full flex-wrap items-center justify-center gap-0.5 sm:justify-start sm:gap-1">
                         {dayItems.length > 0 ? (
-                          <span className="rounded bg-primary/15 px-1 font-mono text-[0.65rem] font-semibold text-primary">
+                          <span className="rounded bg-primary/15 px-1 font-mono text-[0.625rem] font-semibold leading-tight text-primary">
                             {dayItems.length}
                           </span>
                         ) : null}
                         {dayProposed.length > 0 ? (
-                          <span className="rounded border border-dashed border-slot-study-proposed px-1 font-mono text-[0.65rem] font-semibold text-slot-study-proposed-fg">
+                          <span className="rounded border border-dashed border-slot-study-proposed px-0.5 font-mono text-[0.625rem] font-semibold leading-tight text-slot-study-proposed-fg sm:px-1">
                             +{dayProposed.length}
                           </span>
                         ) : null}
                         {dayDeadlines.length > 0 ? (
                           <span
-                            className="rounded bg-warning-accent px-1 font-mono text-[0.65rem] font-semibold text-warning-accent-foreground"
+                            className="rounded bg-warning-accent px-1 font-mono text-[0.625rem] font-semibold leading-tight text-warning-accent-foreground"
                             title={`Prazo: ${dayDeadlines.map((g) => g.title).join(", ")}`}
                           >
                             P

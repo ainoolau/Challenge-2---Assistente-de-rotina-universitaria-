@@ -123,11 +123,11 @@ export function GoalsPanel({
   }
 
   return (
-    <Card>
+    <Card className="min-w-0 [--card-spacing:--spacing(3.5)] sm:[--card-spacing:--spacing(4)]">
       <CardHeader className="gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Target aria-hidden className="size-4 text-primary" />
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Target aria-hidden className="size-4 shrink-0 text-primary" />
             <CardTitle className="text-base">Prioridades e Metas de Estudo</CardTitle>
           </div>
           <Button
@@ -146,15 +146,15 @@ export function GoalsPanel({
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex min-w-0 flex-col gap-4">
         {showForm ? (
           <form
             id={formId}
             onSubmit={handleAdd}
-            className="flex flex-col gap-3 rounded-lg border bg-muted/40 p-3.5"
+            className="flex min-w-0 flex-col gap-3 rounded-lg border bg-muted/40 p-3 sm:p-3.5"
             noValidate
           >
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`${formId}-title`}>Meta de estudo</Label>
               <Input
                 id={`${formId}-title`}
@@ -165,8 +165,8 @@ export function GoalsPanel({
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="flex flex-col gap-1.5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-1.5">
                 <Label htmlFor={`${formId}-dur`}>Duração (min)</Label>
                 <Input
                   id={`${formId}-dur`}
@@ -179,23 +179,13 @@ export function GoalsPanel({
                 />
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={`${formId}-date`}>Prazo (data)</Label>
-                <Input
-                  id={`${formId}-date`}
-                  type="date"
-                  value={deadlineDate}
-                  onChange={(e) => setDeadlineDate(e.target.value)}
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
+              <div className="flex min-w-0 flex-col gap-1.5">
                 <Label htmlFor={`${formId}-prio`}>Prioridade</Label>
                 <select
                   id={`${formId}-prio`}
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
-                  className="h-11 w-full rounded-lg border border-input bg-card px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
                   <option value="5">5 — Crítica</option>
                   <option value="4">4 — Alta</option>
@@ -206,19 +196,30 @@ export function GoalsPanel({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div className="flex flex-col gap-1.5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label htmlFor={`${formId}-date`}>Prazo (data)</Label>
+                <Input
+                  id={`${formId}-date`}
+                  type="date"
+                  value={deadlineDate}
+                  onChange={(e) => setDeadlineDate(e.target.value)}
+                />
+              </div>
+
+              <div className="flex min-w-0 flex-col gap-1.5">
                 <Label htmlFor={`${formId}-time`}>Hora limite</Label>
                 <Input
                   id={`${formId}-time`}
                   type="time"
                   value={deadlineTime}
                   onChange={(e) => setDeadlineTime(e.target.value)}
-                  className="w-36"
                 />
               </div>
+            </div>
 
-              <Button type="submit" size="sm">
+            <div className="flex justify-end pt-1">
+              <Button type="submit" size="sm" className="w-full sm:w-auto">
                 <Plus aria-hidden />
                 Adicionar meta
               </Button>
@@ -236,29 +237,32 @@ export function GoalsPanel({
             proposta de otimização da semana.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex min-w-0 flex-col gap-2">
             {sortedGoals.map((goal) => {
               const prioInfo = PRIORITY_LABELS[goal.priority ?? 1] ?? PRIORITY_LABELS[3];
               return (
                 <li
                   key={goal.goal_id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2.5"
+                  className="flex min-w-0 items-start justify-between gap-2 rounded-lg border bg-background px-3 py-2.5"
                 >
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-semibold">{goal.title}</span>
+                      <span className="break-words text-sm font-semibold">{goal.title}</span>
                       <Badge variant={prioInfo.variant}>{prioInfo.text}</Badge>
                     </div>
-                    <span className="inline-flex flex-wrap items-center gap-2 font-mono text-xs text-muted-foreground tabular-nums">
-                      <CalendarClock aria-hidden className="size-3.5" />
-                      Prazo: {formatShortDateTime(goal.deadline, timeZone)} ·{" "}
-                      {formatMinutes(goal.duration_minutes)}
+                    <span className="inline-flex flex-wrap items-center gap-1.5 font-mono text-xs text-muted-foreground tabular-nums">
+                      <CalendarClock aria-hidden className="size-3.5 shrink-0" />
+                      <span>
+                        Prazo: {formatShortDateTime(goal.deadline, timeZone)} ·{" "}
+                        {formatMinutes(goal.duration_minutes)}
+                      </span>
                     </span>
                   </div>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
+                    className="shrink-0"
                     onClick={() => onRemoveGoal(goal.goal_id)}
                     aria-label={`Remover meta ${goal.title}`}
                   >
@@ -283,11 +287,17 @@ export function GoalsPanel({
             type="button"
             disabled={goals.length === 0 || optimizing}
             onClick={onOptimize}
+            className="w-full sm:w-auto"
           >
             <Sparkles aria-hidden />
             {optimizing ? "Calculando proposta…" : "Otimizar semana"}
           </Button>
-          <Button type="button" variant="secondary" onClick={onOpenReallocate}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onOpenReallocate}
+            className="h-auto min-h-11 w-full whitespace-normal py-2 text-center sm:w-auto"
+          >
             <Shuffle aria-hidden />
             Simular imprevisto / Rebalancear
           </Button>

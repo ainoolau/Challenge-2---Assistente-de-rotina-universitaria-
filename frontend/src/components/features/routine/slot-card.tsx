@@ -82,15 +82,17 @@ export function ScheduleSlotCard({
       onClick={() => onSelect(item)}
       className={cn(
         slotClass,
-        "group flex min-h-11 w-full flex-col gap-1.5 px-3 py-2.5 text-left transition-opacity hover:opacity-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "group flex min-h-11 w-full min-w-0 flex-col gap-1.5 px-3 py-2.5 text-left transition-opacity hover:opacity-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         item.kind === "commute" && "py-2",
       )}
     >
-      <div className="flex flex-wrap items-center justify-between gap-1.5">
-        <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold tabular-nums">
+      <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-1.5">
+        <span className="inline-flex min-w-0 items-center gap-1.5 font-mono text-xs font-semibold tabular-nums">
           <KindIcon kind={item.kind} />
-          {start} – {end}
-          <span className="font-normal opacity-80">({formatMinutes(mins)})</span>
+          <span className="truncate">
+            {start} – {end}
+          </span>
+          <span className="shrink-0 font-normal opacity-80">({formatMinutes(mins)})</span>
         </span>
 
         <div className="flex flex-wrap items-center gap-1">
@@ -111,9 +113,11 @@ export function ScheduleSlotCard({
         </div>
       </div>
 
-      <p className="line-clamp-2 text-sm font-semibold leading-snug">{item.label}</p>
+      <p className="line-clamp-2 w-full break-words text-sm font-semibold leading-snug">
+        {item.label}
+      </p>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs opacity-85">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs opacity-85">
         <span>{KIND_LABELS[item.kind]}</span>
         {item.buffer_before_minutes > 0 || item.buffer_after_minutes > 0 ? (
           <span>
@@ -140,18 +144,20 @@ export function ProposedSlotCard({
 
   return (
     <div
-      className="vezo-slot-study-proposed flex flex-col gap-1.5 px-3 py-2.5"
+      className="vezo-slot-study-proposed flex min-w-0 flex-col gap-1.5 px-3 py-2.5"
       aria-label={`Proposta pendente: ${block.title}`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-1.5">
-        <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold tabular-nums">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5">
+        <span className="inline-flex min-w-0 items-center gap-1.5 font-mono text-xs font-semibold tabular-nums">
           <Sparkles aria-hidden className="size-3.5 shrink-0" />
-          {start} – {end}
+          <span>
+            {start} – {end}
+          </span>
           <span className="font-normal opacity-80">({formatMinutes(mins)})</span>
         </span>
         <Badge variant="proposal">{tagLabel}</Badge>
       </div>
-      <p className="line-clamp-2 text-sm font-semibold leading-snug">{block.title}</p>
+      <p className="line-clamp-2 break-words text-sm font-semibold leading-snug">{block.title}</p>
       <p className="text-xs opacity-85">
         Pendente de confirmação · não salvo na agenda ainda
       </p>
@@ -172,12 +178,12 @@ export function ProtectedSleepCard({
   return (
     <div
       className={cn(
-        "vezo-slot-sleep flex flex-col gap-1 px-3",
+        "vezo-slot-sleep flex min-w-0 flex-col gap-1 px-3",
         compact ? "py-2" : "py-2.5",
       )}
       aria-label={`Sono protegido das ${sleepStart} às ${sleepEnd}`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-1.5">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5">
         <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold tabular-nums">
           <Moon aria-hidden className="size-3.5 shrink-0" />
           {sleepStart} – {sleepEnd}
@@ -188,11 +194,13 @@ export function ProtectedSleepCard({
         </Badge>
       </div>
       {!compact ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs opacity-90">
-          <span>Bloqueado contra alocação automática ({preferences.timezone}).</span>
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs opacity-90">
+          <span className="break-words">
+            Bloqueado contra alocação automática ({preferences.timezone}).
+          </span>
           <Link
             href="/onboarding"
-            className="font-medium underline underline-offset-4 hover:opacity-100"
+            className="shrink-0 font-medium underline underline-offset-4 hover:opacity-100"
           >
             Ajustar em preferências
           </Link>
@@ -216,18 +224,19 @@ export function FreeWindowCard({
   const mins = durationMinutes(window.start, window.end);
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-md border border-dashed border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-      <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border border-dashed border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5">
         <span className="font-mono font-medium text-foreground tabular-nums">
           {start} – {end}
         </span>
-        <span>· Janela livre ({formatMinutes(mins)})</span>
+        <span>· Livre ({formatMinutes(mins)})</span>
       </div>
       {onQuickAdd ? (
         <Button
           type="button"
           variant="ghost"
           size="xs"
+          className="shrink-0"
           onClick={() => onQuickAdd(window)}
           aria-label={`Adicionar compromisso na janela livre ${start} às ${end}`}
         >

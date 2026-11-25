@@ -161,13 +161,13 @@ function ReallocateDialogBody({
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`${formId}-kind`}>Tipo</Label>
               <select
                 id={`${formId}-kind`}
                 value={kind}
                 onChange={(e) => setKind(e.target.value as Exclude<ScheduleSlotKind, "sleep">)}
-                className="h-11 w-full rounded-lg border border-input bg-card px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {DISRUPTION_KINDS.map((k) => (
                   <option key={k} value={k}>
@@ -177,7 +177,7 @@ function ReallocateDialogBody({
               </select>
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`${formId}-date`}>Data</Label>
               <Input
                 id={`${formId}-date`}
@@ -189,8 +189,8 @@ function ReallocateDialogBody({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`${formId}-start`}>Início</Label>
               <Input
                 id={`${formId}-start`}
@@ -200,7 +200,7 @@ function ReallocateDialogBody({
                 required
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`${formId}-end`}>Término</Label>
               <Input
                 id={`${formId}-end`}
@@ -212,7 +212,7 @@ function ReallocateDialogBody({
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <Label htmlFor={`${formId}-note`}>Observação (opcional)</Label>
             <Input
               id={`${formId}-note`}
@@ -238,10 +238,16 @@ function ReallocateDialogBody({
             variant="outline"
             disabled={submitting}
             onClick={onClose}
+            className="w-full sm:w-auto"
           >
             Cancelar
           </Button>
-          <Button type="submit" form={formId} disabled={submitting}>
+          <Button
+            type="submit"
+            form={formId}
+            disabled={submitting}
+            className="h-auto min-h-11 w-full whitespace-normal py-2 text-center sm:w-auto"
+          >
             {submitting ? "Calculando diff…" : "Gerar proposta de rebalanceamento"}
           </Button>
         </DialogFooter>
