@@ -19,7 +19,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col overflow-x-clip">
       <a
         href="#conteudo"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-card focus:px-4 focus:py-3"
@@ -65,7 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main
         id="conteudo"
         tabIndex={-1}
-        className="mx-auto flex w-full max-w-screen-2xl flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0"
+        className="mx-auto flex w-full min-w-0 max-w-screen-2xl flex-1 flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0"
       >
         {children}
       </main>

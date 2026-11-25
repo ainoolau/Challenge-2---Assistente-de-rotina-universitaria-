@@ -69,12 +69,12 @@ export function ProposalReviewPanel({
   const goalLabel = (goalId: string) => goalsById[goalId]?.title ?? goalId;
 
   return (
-    <Card className="border-2 border-dashed border-slot-study-proposed bg-card">
+    <Card className="min-w-0 border-2 border-dashed border-slot-study-proposed bg-card [--card-spacing:--spacing(3.5)] sm:[--card-spacing:--spacing(4)]">
       <CardHeader className="gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Sparkles aria-hidden className="size-4 text-slot-study-proposed" />
-            <CardTitle className="text-lg">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Sparkles aria-hidden className="size-4 shrink-0 text-slot-study-proposed" />
+            <CardTitle className="break-words text-base sm:text-lg">
               {isReallocate ? "Revisar proposta de rebalanceamento" : "Revisar proposta de estudos"}
             </CardTitle>
           </div>
@@ -91,9 +91,9 @@ export function ProposalReviewPanel({
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex min-w-0 flex-col gap-4">
         {diffSummary ? (
-          <div className="rounded-lg border bg-muted/60 px-3 py-2.5 text-sm text-foreground">
+          <div className="break-words rounded-lg border bg-muted/60 px-3 py-2.5 text-sm text-foreground">
             {diffSummary}
           </div>
         ) : null}
@@ -324,6 +324,7 @@ export function ProposalReviewPanel({
           variant="outline"
           disabled={busyAction !== null}
           onClick={onReject}
+          className="w-full sm:w-auto"
         >
           <X aria-hidden />
           {busyAction === "reject" ? "Descartando…" : "Descartar"}
@@ -332,6 +333,7 @@ export function ProposalReviewPanel({
           type="button"
           disabled={busyAction !== null || isVersionConflict}
           onClick={onConfirm}
+          className="w-full sm:w-auto"
         >
           <Check aria-hidden />
           {busyAction === "confirm" ? "Aplicando…" : "Confirmar e aplicar"}

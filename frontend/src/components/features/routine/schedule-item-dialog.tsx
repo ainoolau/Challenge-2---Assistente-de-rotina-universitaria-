@@ -254,7 +254,7 @@ function ScheduleItemDialogBody({
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`${formId}-kind`}>Categoria</Label>
               <select
                 id={`${formId}-kind`}
@@ -264,7 +264,7 @@ function ScheduleItemDialogBody({
                   setKind(nextKind);
                   if (nextKind === "study") setFixed(false);
                 }}
-                className="h-11 w-full rounded-lg border border-input bg-card px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {EDITABLE_KINDS.map((k) => (
                   <option key={k} value={k}>
@@ -274,7 +274,7 @@ function ScheduleItemDialogBody({
               </select>
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`${formId}-date`}>Data</Label>
               <Input
                 id={`${formId}-date`}
@@ -287,8 +287,8 @@ function ScheduleItemDialogBody({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`${formId}-start`}>Início</Label>
               <Input
                 id={`${formId}-start`}
@@ -300,7 +300,7 @@ function ScheduleItemDialogBody({
               />
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`${formId}-end`}>Término</Label>
               <Input
                 id={`${formId}-end`}
@@ -313,8 +313,8 @@ function ScheduleItemDialogBody({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`${formId}-buf-before`}>Buffer antes (min)</Label>
               <Input
                 id={`${formId}-buf-before`}
@@ -325,7 +325,7 @@ function ScheduleItemDialogBody({
                 onChange={(e) => setBufferBefore(e.target.value)}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`${formId}-buf-after`}>Buffer depois (min)</Label>
               <Input
                 id={`${formId}-buf-after`}
@@ -434,31 +434,36 @@ function ScheduleItemDialogBody({
           ) : null}
         </form>
 
-        <DialogFooter className="sm:justify-between">
+        <DialogFooter className="sm:items-center sm:justify-between">
           {editingItem ? (
             <Button
               type="button"
               variant="destructive"
               disabled={submitting}
               onClick={() => void submitDelete(false)}
+              className="w-full sm:mr-auto sm:w-auto"
             >
               <Trash2 aria-hidden />
               Remover
             </Button>
-          ) : (
-            <span />
-          )}
+          ) : null}
 
-          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+          <div className="flex flex-col-reverse gap-2 sm:ml-auto sm:flex-row">
             <Button
               type="button"
               variant="outline"
               disabled={submitting}
               onClick={onClose}
+              className="w-full sm:w-auto"
             >
               Cancelar
             </Button>
-            <Button type="submit" form={formId} disabled={submitting}>
+            <Button
+              type="submit"
+              form={formId}
+              disabled={submitting}
+              className="w-full sm:w-auto"
+            >
               {submitting
                 ? "Salvando…"
                 : editingItem

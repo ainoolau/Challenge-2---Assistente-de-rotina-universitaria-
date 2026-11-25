@@ -2,7 +2,7 @@
 
 import { RotateCw, WifiOff } from "lucide-react";
 
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useApiHealth } from "@/hooks/use-api-health";
 import { useOnlineStatus } from "@/hooks/use-online-status";
@@ -33,20 +33,25 @@ export function ConnectionBanner() {
   if (state.status !== "down") return null;
 
   return (
-    <Alert variant="destructive" className="rounded-none border-x-0 border-t-0 pr-36">
+    <Alert variant="destructive" className="rounded-none border-x-0 border-t-0">
       <WifiOff aria-hidden />
       <AlertTitle>Vezo indisponível no momento</AlertTitle>
-      <AlertDescription>
-        {state.error.kind === "network"
-          ? "Não conseguimos falar com o servidor. Algumas informações podem não carregar."
-          : state.error.message}
-      </AlertDescription>
-      <AlertAction className="top-1/2 -translate-y-1/2">
-        <Button variant="outline" size="sm" onClick={() => void recheck()}>
+      <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <span>
+          {state.error.kind === "network"
+            ? "Não conseguimos falar com o servidor. Algumas informações podem não carregar."
+            : state.error.message}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-fit shrink-0"
+          onClick={() => void recheck()}
+        >
           <RotateCw aria-hidden />
           Tentar de novo
         </Button>
-      </AlertAction>
+      </AlertDescription>
     </Alert>
   );
 }
