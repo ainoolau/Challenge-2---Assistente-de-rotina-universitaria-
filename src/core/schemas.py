@@ -26,11 +26,16 @@ class Interval(Contract):
         return self
 
 
+ScheduleModality = Literal["presencial", "remoto", "hibrido"]
+
+
 class ScheduleSlot(Interval):
     slot_id: str | None = Field(default=None, max_length=100)
     label: str = Field(min_length=1, max_length=200)
     kind: Literal["sleep", "work", "class", "commute", "other"] = "other"
     fixed: bool = True
+    modality: ScheduleModality = "presencial"
+    allow_overlap: bool = False
     buffer_before_minutes: int = Field(default=0, ge=0, le=180)
     buffer_after_minutes: int = Field(default=0, ge=0, le=180)
 

@@ -79,10 +79,7 @@ export function ProposalReviewPanel({
             </CardTitle>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant="proposal">Pendente · Requer confirmação</Badge>
-            <Badge variant="outline" className="font-mono">
-              base v{proposal.base_version}
-            </Badge>
+            <Badge variant="proposal">Aguardando confirmação</Badge>
           </div>
         </div>
         <CardDescription>
@@ -101,7 +98,7 @@ export function ProposalReviewPanel({
         {reasons.length > 0 ? (
           <div className="flex flex-col gap-1.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Justificativas do motor determinístico
+              Resumo das mudanças
             </p>
             <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
               {reasons.map((reason, idx) => (
@@ -206,7 +203,7 @@ export function ProposalReviewPanel({
             {rebalance.diff.kept.length > 0 ? (
               <div className="flex flex-col gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Blocos preservados sem alteração (mínima perturbação)
+                  Blocos mantidos sem alteração
                 </p>
                 <ul className="flex flex-col gap-1.5">
                   {rebalance.diff.kept.map((block, idx) => (
@@ -278,10 +275,7 @@ export function ProposalReviewPanel({
         ) : (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <ShieldCheck aria-hidden className="size-4 text-success" />
-            <span>
-              Auditoria determinística aprovada: zero invasões de sono protegido ou compromissos
-              fixos.
-            </span>
+            <span>Verificado: seu sono e compromissos fixos estão preservados.</span>
           </div>
         )}
 
@@ -290,7 +284,7 @@ export function ProposalReviewPanel({
             <AlertTriangle aria-hidden />
             <AlertTitle>
               {isVersionConflict
-                ? "Agenda desatualizada (conflito de versão 409)"
+                ? "Sua agenda mudou enquanto você revisava"
                 : "Não foi possível aplicar a proposta"}
             </AlertTitle>
             <AlertDescription className="flex flex-col gap-2">
@@ -305,9 +299,7 @@ export function ProposalReviewPanel({
                     onClick={onRecalculate}
                   >
                     <RefreshCw aria-hidden />
-                    {busyAction === "recalculate"
-                      ? "Recalculando…"
-                      : "Recalcular proposta na versão atual"}
+                    {busyAction === "recalculate" ? "Recalculando…" : "Recalcular proposta"}
                   </Button>
                 </div>
               ) : null}

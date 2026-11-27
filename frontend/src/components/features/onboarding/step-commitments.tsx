@@ -20,13 +20,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
+import { MODALITY_LABELS, MODALITY_OPTIONS } from "../routine/schedule-utils";
 import { ChoiceGroup, FieldMessage } from "./onboarding-fields";
 import {
+  FREQUENCY_OPTIONS,
   KIND_LABEL,
   KIND_OPTIONS,
   WEEKDAYS,
+  commitmentOccurrenceKeys,
   emptyCommitment,
   exampleScenario,
+  formatCommitmentSchedule,
   formatWeekdays,
   hasErrors,
   occurrenceKey,
@@ -53,14 +57,15 @@ export const KIND_SLOT_CLASS: Record<CommitmentKind, string> = {
 };
 
 export interface CommitmentFailure {
-  /** Dias (0–6) que o backend recusou. */
-  weekdays: number[];
+  /** Rótulos dos dias/datas que o backend recusou (ex.: "Seg", "28/11"). */
+  labels: string[];
   message: string;
   kind: "sleep" | "validation" | "other";
 }
 
 interface StepCommitmentsProps {
   commitments: CommitmentDraft[];
+  defaultDateKey: string;
   onChange: (next: CommitmentDraft[]) => void;
   savedKeys: ReadonlySet<string>;
   failures: Record<string, CommitmentFailure>;
@@ -69,9 +74,10 @@ interface StepCommitmentsProps {
   onEditingChange: (draft: CommitmentDraft | null) => void;
 }
 
-/** Etapa 3 — Compromissos fixos da semana (multijornada). */
+/** Etapa 3 — Compromissos fixos e compromissos pontuais com data. */
 export function StepCommitments({
   commitments,
+  defaultDateKey,
   onChange,
   savedKeys,
   failures,
@@ -88,21 +94,24 @@ export function StepCommitments({
   }
 
   function savedDays(commitment: CommitmentDraft): number[] {
+    if (commitment.frequency !== "weekly") return [];
     return commitment.weekdays.filter((d) => savedKeys.has(occurrenceKey(commitment.id, d)));
   }
 
   return (
     <div className="flex flex-col gap-5">
       <p className="text-base">
-        Cadastre o que já ocupa sua semana. O Vezo nunca move compromissos fixos e só sugere estudo
-        nos espaços livres.
+        Cadastre seus compromissos fixos da semana ou eventos pontuais com data (como provas e
+        consultas). O Vezo nunca move esses horários e só sugere estudo nos espaços livres.
       </p>
 
       {commitments.length === 0 ? null : (
         <ul className="flex flex-col gap-2" aria-label="Compromissos cadastrados">
           {commitments.map((commitment) => {
+            const allKeys = commitmentOccurrenceKeys(commitment);
             const saved = savedDays(commitment);
-            const fullySaved = saved.length === commitment.weekdays.length;
+            const savedCount = allKeys.filter((k) => savedKeys.has(k)).length;
+            const fullySaved = allKeys.length > 0 && savedCount === allKeys.length;
             const failure = failures[commitment.id];
             if (editing?.id === commitment.id) return null;
             return (
@@ -116,13 +125,20 @@ export function StepCommitments({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className="flex items-center gap-1.5 text-xs font-medium">
+                    <span className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
                       <span aria-hidden>{KIND_ICON[commitment.kind]}</span>
-                      {KIND_LABEL[commitment.kind]}
+                      <span>{KIND_LABEL[commitment.kind]}</span>
+                      {commitment.modality !== "presencial" ? (
+                        <span>· {MODALITY_LABELS[commitment.modality]}</span>
+                      ) : null}
+                      {commitment.allowOverlap ? <span>· Paralelo</span> : null}
                     </span>
                     <span className="line-clamp-2 font-semibold">{commitment.label}</span>
                     <span className="font-mono text-sm tabular-nums">
-                      {formatWeekdays(commitment.weekdays)} · <span className="whitespace-nowrap">{commitment.startTime} – {commitment.endTime}</span>
+                      {formatCommitmentSchedule(commitment)} ·{" "}
+                      <span className="whitespace-nowrap">
+                        {commitment.startTime} – {commitment.endTime}
+                      </span>
                     </span>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -142,7 +158,7 @@ export function StepCommitments({
                         >
                           <Pencil aria-hidden />
                         </Button>
-                        {saved.length === 0 ? (
+                        {savedCount === 0 ? (
                           <Button
                             type="button"
                             variant="ghost"
@@ -166,7 +182,7 @@ export function StepCommitments({
                   <p className="flex items-start gap-2 text-sm font-medium" role="status">
                     <ShieldAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
                     <span>
-                      {formatWeekdays(failure.weekdays)}: {failure.message}
+                      {failure.labels.join(", ")}: {failure.message}
                     </span>
                   </p>
                 ) : null}
@@ -187,7 +203,11 @@ export function StepCommitments({
         />
       ) : (
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button type="button" variant="outline" onClick={() => setEditing(emptyCommitment())}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setEditing(emptyCommitment("class", defaultDateKey))}
+          >
             <Plus aria-hidden />
             Adicionar compromisso
           </Button>
@@ -197,15 +217,15 @@ export function StepCommitments({
       {savedKeys.size === 0 ? (
         <div className="flex flex-col gap-2 rounded-lg border border-dashed p-4">
           <p className="text-sm text-muted-foreground">
-            Só quer ver o Vezo funcionando? Carregue uma semana fictícia de multijornada (residência,
-            aulas noturnas, deslocamento e uma entrega).
+            Só quer testar o Vezo rapidamente? Carregue uma rotina de exemplo com trabalho, aulas,
+            deslocamento e um compromisso pontual.
           </p>
           <Button
             type="button"
             variant="secondary"
             className="self-start"
             onClick={() => {
-              onChange(exampleScenario());
+              onChange(exampleScenario(defaultDateKey));
               setEditing(null);
             }}
           >
@@ -237,7 +257,12 @@ function CommitmentEditor({
     label: useId(),
     labelError: useId(),
     kindError: useId(),
+    freqError: useId(),
+    date: useId(),
+    dateError: useId(),
     weekdaysError: useId(),
+    modalityError: useId(),
+    overlap: useId(),
     start: useId(),
     startError: useId(),
     end: useId(),
@@ -271,7 +296,15 @@ function CommitmentEditor({
     const found = validateCommitment(draft);
     setErrors(found);
     if (hasErrors(found)) {
-      const first = found.label ? ids.label : found.startTime ? ids.start : found.endTime ? ids.end : null;
+      const first = found.label
+        ? ids.label
+        : found.dateKey
+          ? ids.date
+          : found.startTime
+            ? ids.start
+            : found.endTime
+              ? ids.end
+              : null;
       if (first) document.getElementById(first)?.focus();
       return;
     }
@@ -288,10 +321,15 @@ function CommitmentEditor({
 
       <ChoiceGroup
         name={`kind-${initial.id}`}
-        legend="Tipo"
+        legend="Categoria"
         options={KIND_OPTIONS.map((option) => ({ ...option, icon: KIND_ICON[option.value] }))}
         value={draft.kind}
-        onChange={(kind) => patch({ kind })}
+        onChange={(kind) =>
+          patch({
+            kind,
+            ...(kind === "other" && draft.weekdays.length === 0 ? { frequency: "once" } : {}),
+          })
+        }
         errorId={ids.kindError}
         columns="two"
       />
@@ -302,7 +340,15 @@ function CommitmentEditor({
           id={ids.label}
           value={draft.label}
           maxLength={200}
-          placeholder={draft.kind === "other" ? "Ex.: Entrega do TCC" : "Ex.: Aula de Cálculo"}
+          placeholder={
+            draft.kind === "other"
+              ? "Ex.: Consulta médica ou Prova de Cálculo"
+              : draft.kind === "work"
+                ? "Ex.: Estágio ou Trabalho"
+                : draft.kind === "commute"
+                  ? "Ex.: Ônibus até a faculdade"
+                  : "Ex.: Aula de Cálculo"
+          }
           onChange={(event) => patch({ label: event.target.value })}
           aria-invalid={errors.label ? true : undefined}
           aria-describedby={errors.label ? ids.labelError : undefined}
@@ -311,41 +357,68 @@ function CommitmentEditor({
         <FieldMessage id={ids.labelError}>{errors.label}</FieldMessage>
       </div>
 
-      <fieldset
-        className="flex flex-col gap-2"
-        aria-describedby={errors.weekdays ? ids.weekdaysError : undefined}
-      >
-        <legend className="mb-1 text-sm font-medium">Dias da semana</legend>
-        <div className="grid grid-cols-7 gap-1">
-          {WEEKDAYS.map((day, index) => {
-            const pressed = draft.weekdays.includes(index);
-            const locked = lockedWeekdays.includes(index);
-            return (
-              <button
-                key={day.short}
-                type="button"
-                aria-pressed={pressed}
-                aria-label={`${day.long}${locked ? " (já salvo)" : ""}`}
-                disabled={locked}
-                onClick={() => toggleDay(index)}
-                className={cn(
-                  "flex h-11 items-center justify-center rounded-lg border text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60",
-                  pressed
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-card hover:bg-muted",
-                )}
-              >
-                {day.short}
-              </button>
-            );
-          })}
+      {lockedWeekdays.length === 0 ? (
+        <ChoiceGroup
+          name={`freq-${initial.id}`}
+          legend="Frequência"
+          options={FREQUENCY_OPTIONS}
+          value={draft.frequency}
+          onChange={(frequency) => patch({ frequency })}
+          errorId={ids.freqError}
+          columns="two"
+        />
+      ) : null}
+
+      {draft.frequency === "once" ? (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={ids.date}>Data</Label>
+          <Input
+            id={ids.date}
+            type="date"
+            value={draft.dateKey}
+            onChange={(event) => patch({ dateKey: event.target.value })}
+            aria-invalid={errors.dateKey ? true : undefined}
+            aria-describedby={errors.dateKey ? ids.dateError : undefined}
+          />
+          <FieldMessage id={ids.dateError}>{errors.dateKey}</FieldMessage>
         </div>
-        <FieldMessage id={ids.weekdaysError}>{errors.weekdays}</FieldMessage>
-      </fieldset>
+      ) : (
+        <fieldset
+          className="flex flex-col gap-2"
+          aria-describedby={errors.weekdays ? ids.weekdaysError : undefined}
+        >
+          <legend className="mb-1 text-sm font-medium">Dias da semana</legend>
+          <div className="grid grid-cols-7 gap-1">
+            {WEEKDAYS.map((day, index) => {
+              const pressed = draft.weekdays.includes(index);
+              const locked = lockedWeekdays.includes(index);
+              return (
+                <button
+                  key={day.short}
+                  type="button"
+                  aria-pressed={pressed}
+                  aria-label={`${day.long}${locked ? " (já salvo)" : ""}`}
+                  disabled={locked}
+                  onClick={() => toggleDay(index)}
+                  className={cn(
+                    "flex h-11 items-center justify-center rounded-lg border text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60",
+                    pressed
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card hover:bg-muted",
+                  )}
+                >
+                  {day.short}
+                </button>
+              );
+            })}
+          </div>
+          <FieldMessage id={ids.weekdaysError}>{errors.weekdays}</FieldMessage>
+        </fieldset>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-2">
-          <Label htmlFor={ids.start}>{draft.kind === "other" ? "Reservar das" : "Início"}</Label>
+          <Label htmlFor={ids.start}>Início</Label>
           <Input
             id={ids.start}
             type="time"
@@ -358,7 +431,7 @@ function CommitmentEditor({
           <FieldMessage id={ids.startError}>{errors.startTime}</FieldMessage>
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor={ids.end}>{draft.kind === "other" ? "Até" : "Término"}</Label>
+          <Label htmlFor={ids.end}>Término</Label>
           <Input
             id={ids.end}
             type="time"
@@ -371,6 +444,33 @@ function CommitmentEditor({
           <FieldMessage id={ids.endError}>{errors.endTime}</FieldMessage>
         </div>
       </div>
+
+      <ChoiceGroup
+        name={`modality-${initial.id}`}
+        legend="Modalidade"
+        description="Compromissos remotos não reservam tempo automático de deslocamento."
+        options={MODALITY_OPTIONS.map((value) => ({ value, label: MODALITY_LABELS[value] }))}
+        value={draft.modality}
+        onChange={(modality) => patch({ modality })}
+        errorId={ids.modalityError}
+      />
+
+      <label
+        htmlFor={ids.overlap}
+        className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm has-[:checked]:border-primary has-[:checked]:bg-accent"
+      >
+        <input
+          id={ids.overlap}
+          type="checkbox"
+          checked={draft.allowOverlap}
+          onChange={(event) => patch({ allowOverlap: event.target.checked })}
+          className="mt-0.5 size-5 shrink-0 accent-primary"
+        />
+        <span>
+          <strong>Pode ocorrer em paralelo</strong> — permite coexistir com outro compromisso no
+          mesmo horário sem gerar alerta de conflito.
+        </span>
+      </label>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="button" variant="ghost" onClick={onCancel}>

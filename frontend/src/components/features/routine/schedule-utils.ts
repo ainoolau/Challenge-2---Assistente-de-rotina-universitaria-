@@ -4,6 +4,7 @@ import type {
   ProposedBlock,
   ScheduleItemKind,
   ScheduleItemResponse,
+  ScheduleModality,
 } from "@/types/api";
 
 export type RoutineViewMode = "hoje" | "semana" | "mes";
@@ -14,12 +15,24 @@ export type DayLoadLevel = "leve" | "moderada" | "intensa" | "sobrecarga";
 
 export const KIND_LABELS: Record<ScheduleItemKind, string> = {
   class: "Aula",
-  work: "Trabalho / Residência",
+  work: "Trabalho",
   commute: "Deslocamento",
   study: "Estudo",
   sleep: "Sono protegido",
   other: "Outro",
 };
+
+export const MODALITY_LABELS: Record<ScheduleModality, string> = {
+  presencial: "Presencial",
+  remoto: "Remoto",
+  hibrido: "Híbrido",
+};
+
+export const MODALITY_OPTIONS: readonly ScheduleModality[] = [
+  "presencial",
+  "remoto",
+  "hibrido",
+] as const;
 
 export const EDITABLE_KINDS: readonly Exclude<ScheduleItemKind, "sleep">[] = [
   "class",
@@ -195,6 +208,71 @@ export function buildHorizonForDay(dateKey: string, timeZone: string): Interval 
     start: buildZonedIso(dateKey, "00:00", timeZone),
     end: buildZonedIso(addDaysToKey(dateKey, 1), "00:00", timeZone),
   };
+}
+
+/** Arredonda `date` para cima até o próximo múltiplo de `stepMinutes` (padrão 15 min). */
+export function ceilToMinutes(date: Date, stepMinutes = 15): Date {
+  const stepMs = stepMinutes * 60 * 1000;
+  return new Date(Math.ceil(date.getTime() / stepMs) * stepMs);
+}
+
+/**
+ * Constrói horizonte de planejamento que nunca volta no tempo (TASK-F1-07).
+ * Recorta o início para `max(weekStart, ceilToMinutes(now, 15))` e sinaliza
+ * `isPastWeek = true` caso toda a semana já tenha encerrado.
+ */
+export function buildPlanningHorizon(
+  weekKeys: string[],
+  timeZone: string,
+  now: Date = new Date(),
+): { horizon: Interval; isPastWeek: boolean } {
+  const raw = buildHorizonForWeek(weekKeys, timeZone);
+  const weekStartMs = new Date(raw.start).getTime();
+  const weekEndMs = new Date(raw.end).getTime();
+  const ceiled = ceilToMinutes(now, 15);
+  const ceiledMs = ceiled.getTime();
+
+  if (ceiledMs >= weekEndMs) {
+    return { horizon: raw, isPastWeek: true };
+  }
+  if (ceiledMs <= weekStartMs) {
+    return { horizon: raw, isPastWeek: false };
+  }
+  const dateKey = toDateKey(ceiled, timeZone);
+  const hhmm = toLocalTimeHHMM(ceiled.toISOString(), timeZone);
+  return {
+    horizon: {
+      start: buildZonedIso(dateKey, hhmm, timeZone),
+      end: raw.end,
+    },
+    isPastWeek: false,
+  };
+}
+
+/** Oculta janelas livres encerradas e recorta a janela atual para não exibir passado. */
+export function filterUpcomingFreeWindows(
+  windows: Interval[],
+  timeZone: string,
+  now: Date = new Date(),
+): Interval[] {
+  const nowMs = now.getTime();
+  const nowKey = toDateKey(now, timeZone);
+  const nowHHMM = toLocalTimeHHMM(now.toISOString(), timeZone);
+  const nowIso = buildZonedIso(nowKey, nowHHMM, timeZone);
+  const result: Interval[] = [];
+  for (const win of windows) {
+    const startMs = new Date(win.start).getTime();
+    const endMs = new Date(win.end).getTime();
+    if (endMs <= nowMs) continue;
+    if (startMs < nowMs) {
+      if (new Date(nowIso).getTime() < endMs) {
+        result.push({ start: nowIso, end: win.end });
+      }
+    } else {
+      result.push(win);
+    }
+  }
+  return result;
 }
 
 /** Formata data curta para cabeçalhos de coluna (ex.: "Seg · 23/11"). */

@@ -7,11 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { MODALITY_LABELS } from "../routine/schedule-utils";
 import {
   KIND_LABEL,
+  commitmentOccurrenceKeys,
+  formatCommitmentSchedule,
   formatMinutesLabel,
-  formatWeekdays,
-  occurrenceKey,
+  formatTimezoneLabel,
   type CommitmentDraft,
   type StepId,
   type WellbeingDraft,
@@ -69,7 +71,8 @@ export function StepReview({
   onGoTo: (step: StepId) => void;
 }) {
   const pendingCount = commitments.reduce(
-    (total, c) => total + c.weekdays.filter((d) => !savedKeys.has(occurrenceKey(c.id, d))).length,
+    (total, c) =>
+      total + commitmentOccurrenceKeys(c).filter((key) => !savedKeys.has(key)).length,
     0,
   );
 
@@ -102,7 +105,7 @@ export function StepReview({
         editLabel="Editar sono e ritmo de estudo"
       >
         <dl className="flex flex-col gap-2">
-          <Row label="Fuso horário">{wellbeing.timezone}</Row>
+          <Row label="Fuso horário">{formatTimezoneLabel(wellbeing.timezone)}</Row>
           <Row label="Sono protegido">
             <span className="inline-flex items-center gap-1.5 font-mono tabular-nums">
               <Lock aria-hidden className="size-3.5" />
@@ -132,20 +135,28 @@ export function StepReview({
             </p>
             <ul className="flex flex-col gap-2">
               {commitments.map((c) => {
-                const fullySaved = c.weekdays.every((d) => savedKeys.has(occurrenceKey(c.id, d)));
+                const keys = commitmentOccurrenceKeys(c);
+                const fullySaved = keys.length > 0 && keys.every((key) => savedKeys.has(key));
                 return (
                   <li
                     key={c.id}
                     className={cn("flex items-start justify-between gap-3 rounded-lg p-3", KIND_SLOT_CLASS[c.kind])}
                   >
                     <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="flex items-center gap-1.5 text-xs font-medium">
+                      <span className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
                         <span aria-hidden>{KIND_ICON[c.kind]}</span>
-                        {KIND_LABEL[c.kind]}
+                        <span>{KIND_LABEL[c.kind]}</span>
+                        {c.modality !== "presencial" ? (
+                          <span>· {MODALITY_LABELS[c.modality]}</span>
+                        ) : null}
+                        {c.allowOverlap ? <span>· Paralelo</span> : null}
                       </span>
                       <span className="line-clamp-2 text-sm font-semibold">{c.label}</span>
                       <span className="font-mono text-sm tabular-nums">
-                        {formatWeekdays(c.weekdays)} · <span className="whitespace-nowrap">{c.startTime} – {c.endTime}</span>
+                        {formatCommitmentSchedule(c)} ·{" "}
+                        <span className="whitespace-nowrap">
+                          {c.startTime} – {c.endTime}
+                        </span>
                       </span>
                     </div>
                     {fullySaved ? (

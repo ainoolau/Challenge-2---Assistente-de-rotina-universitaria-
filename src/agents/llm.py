@@ -2,6 +2,7 @@
 
 import json
 import os
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -10,6 +11,25 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from pydantic import BaseModel
+
+
+class CallPacer:
+    """Controle de pacing thread-safe compartilhável entre chamadas/requisições Groq."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.last_request_at = 0.0
+
+    def wait(self, min_interval: float) -> float:
+        with self._lock:
+            now = time.monotonic()
+            wait_sec = 0.0
+            if min_interval > 0 and self.last_request_at > 0:
+                wait_sec = max(0.0, min_interval - (now - self.last_request_at))
+                if wait_sec > 0:
+                    time.sleep(wait_sec)
+            self.last_request_at = time.monotonic()
+            return wait_sec
 
 
 def load_api_key(path: Path) -> None:
@@ -43,21 +63,21 @@ class LLMConfig:
 
 
 class GroqLLM:
-    def __init__(self, config: LLMConfig):
-        self.last_request_at = 0.0
+    def __init__(self, config: LLMConfig, *, pacer: CallPacer | None = None):
+        self._pacer = pacer or CallPacer()
+        self.last_request_at = self._pacer.last_request_at
         self.config = config
         self.calls: list[dict[str, Any]] = []
+
+    def set_pacer(self, pacer: CallPacer) -> None:
+        self._pacer = pacer
+        self.last_request_at = pacer.last_request_at
 
     def complete(self, role, instructions, data, output):
         if not os.environ.get("GROQ_API_KEY"):
             raise RuntimeError("GROQ_API_KEY ausente")
-        wait = max(
-            0.0,
-            self.config.min_call_interval - (time.monotonic() - self.last_request_at),
-        )
-        if wait:
-            time.sleep(wait)
-        self.last_request_at = time.monotonic()
+        wait = self._pacer.wait(self.config.min_call_interval)
+        self.last_request_at = self._pacer.last_request_at
         entry = {
             "role": role,
             "status": "error",
@@ -130,6 +150,13 @@ class GroqLLM:
             return value
         except urllib.error.HTTPError as exc:
             entry["http_status"] = exc.code
+            if exc.code == 429 and exc.headers is not None:
+                raw_retry = exc.headers.get("Retry-After")
+                if raw_retry:
+                    try:
+                        entry["retry_after_seconds"] = max(0.0, float(raw_retry))
+                    except ValueError:
+                        pass
             raise
         finally:
             entry["latency_ms"] = round((time.perf_counter() - start) * 1000, 3)

@@ -18,7 +18,6 @@ import {
   STEPS,
   describeFieldErrors,
   expandOccurrences,
-  formatWeekdays,
   hasErrors,
   initialWellbeing,
   toPreferencesUpdate,
@@ -96,7 +95,8 @@ function OnboardingWizard({ initialPrefs }: { initialPrefs: SessionPreferences |
     headingRef.current?.focus();
   }, [stepIndex]);
 
-  const weekKeys = getWeekKeys(toDateKey(today, wellbeing.timezone));
+  const todayKey = toDateKey(today, wellbeing.timezone);
+  const weekKeys = getWeekKeys(todayKey);
   const weekLabel = `${formatDayHeader(weekKeys[0] ?? "").dayMonth} a ${
     formatDayHeader(weekKeys[6] ?? "").dayMonth
   }`;
@@ -197,7 +197,7 @@ function OnboardingWizard({ initialPrefs }: { initialPrefs: SessionPreferences |
             : apiError.message;
         const previous = found[occurrence.commitmentId];
         found[occurrence.commitmentId] = {
-          weekdays: [...(previous?.weekdays ?? []), occurrence.weekday],
+          labels: [...(previous?.labels ?? []), occurrence.slotLabel],
           message,
           kind: isSleep ? "sleep" : apiError.kind === "validation" ? "validation" : "other",
         };
@@ -320,6 +320,7 @@ function OnboardingWizard({ initialPrefs }: { initialPrefs: SessionPreferences |
             ) : null}
             <StepCommitments
               commitments={commitments}
+              defaultDateKey={todayKey}
               onChange={(nextList) => {
                 setCommitments(nextList);
                 setStepError(undefined);
@@ -351,7 +352,7 @@ function OnboardingWizard({ initialPrefs }: { initialPrefs: SessionPreferences |
                       .filter((c) => failures[c.id])
                       .map((c) => (
                         <li key={c.id}>
-                          <strong>{c.label}</strong> ({formatWeekdays(failures[c.id]?.weekdays ?? [])}):{" "}
+                          <strong>{c.label}</strong> ({(failures[c.id]?.labels ?? []).join(", ")}):{" "}
                           {failures[c.id]?.message}
                         </li>
                       ))}

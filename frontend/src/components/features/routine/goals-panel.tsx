@@ -36,6 +36,7 @@ interface GoalsPanelProps {
   goals: StudyGoal[];
   timeZone: string;
   anchorDateKey: string;
+  isPastWeek?: boolean;
   optimizing: boolean;
   optimizeError: string | null;
   onAddGoal: (goal: StudyGoal) => void;
@@ -56,6 +57,7 @@ export function GoalsPanel({
   goals,
   timeZone,
   anchorDateKey,
+  isPastWeek = false,
   optimizing,
   optimizeError,
   onAddGoal,
@@ -86,7 +88,7 @@ export function GoalsPanel({
     const prio = Number(priority);
 
     if (!trimmed) {
-      setLocalError("Informe o título da meta de estudo.");
+      setLocalError("Informe o que precisa fazer ou entregar.");
       return;
     }
     if (!Number.isInteger(mins) || mins < 15 || mins > 10080) {
@@ -128,7 +130,7 @@ export function GoalsPanel({
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <Target aria-hidden className="size-4 shrink-0 text-primary" />
-            <CardTitle className="text-base">Prioridades e Metas de Estudo</CardTitle>
+            <CardTitle className="text-base">O que você precisa encaixar na semana?</CardTitle>
           </div>
           <Button
             type="button"
@@ -137,12 +139,13 @@ export function GoalsPanel({
             onClick={() => setShowForm((prev) => !prev)}
           >
             <Plus aria-hidden />
-            {showForm ? "Fechar formulário" : "Nova meta"}
+            {showForm ? "Fechar formulário" : "Nova demanda"}
           </Button>
         </div>
         <CardDescription>
-          Cadastre metas com prazo e prioridade para o motor determinístico encaixar blocos de
-          estudo nas suas janelas livres (sem invadir sono ou compromissos fixos).
+          Adicione entregas, provas, estudos, projetos ou preparações de trabalho com prazo e
+          prioridade. Você não precisa escolher o horário: o Vezo encaixa nos espaços livres,
+          respeitando seu sono e compromissos fixos.
         </CardDescription>
       </CardHeader>
 
@@ -155,12 +158,12 @@ export function GoalsPanel({
             noValidate
           >
             <div className="flex min-w-0 flex-col gap-1.5">
-              <Label htmlFor={`${formId}-title`}>Meta de estudo</Label>
+              <Label htmlFor={`${formId}-title`}>O que precisa fazer?</Label>
               <Input
                 id={`${formId}-title`}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex.: Revisão para Prova A1 — Econometria"
+                placeholder="Ex.: Preparar reunião, Prova A1 ou Entrega do projeto"
                 maxLength={200}
               />
             </div>
@@ -221,7 +224,7 @@ export function GoalsPanel({
             <div className="flex justify-end pt-1">
               <Button type="submit" size="sm" className="w-full sm:w-auto">
                 <Plus aria-hidden />
-                Adicionar meta
+                Adicionar demanda
               </Button>
             </div>
 
@@ -233,8 +236,8 @@ export function GoalsPanel({
 
         {sortedGoals.length === 0 ? (
           <p className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
-            Nenhuma meta de estudo cadastrada ainda. Adicione uma meta acima para gerar uma
-            proposta de otimização da semana.
+            Nenhuma demanda cadastrada ainda. Adicione uma tarefa com prazo acima para o Vezo
+            sugerir os melhores horários livres na sua semana.
           </p>
         ) : (
           <ul className="flex min-w-0 flex-col gap-2">
@@ -282,10 +285,16 @@ export function GoalsPanel({
           </Alert>
         ) : null}
 
+        {isPastWeek ? (
+          <p className="text-xs text-muted-foreground">
+            Esta semana já passou. Avance para a semana atual ou futura para gerar novas propostas.
+          </p>
+        ) : null}
+
         <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap">
           <Button
             type="button"
-            disabled={goals.length === 0 || optimizing}
+            disabled={goals.length === 0 || optimizing || isPastWeek}
             onClick={onOptimize}
             className="w-full sm:w-auto"
           >
@@ -295,6 +304,7 @@ export function GoalsPanel({
           <Button
             type="button"
             variant="secondary"
+            disabled={isPastWeek}
             onClick={onOpenReallocate}
             className="h-auto min-h-11 w-full whitespace-normal py-2 text-center sm:w-auto"
           >

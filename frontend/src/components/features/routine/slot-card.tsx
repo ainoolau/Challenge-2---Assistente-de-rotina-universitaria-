@@ -28,6 +28,7 @@ import type {
 
 import {
   KIND_LABELS,
+  MODALITY_LABELS,
   durationMinutes,
   formatMinutes,
   toLocalTimeHHMM,
@@ -119,9 +120,13 @@ export function ScheduleSlotCard({
 
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs opacity-85">
         <span>{KIND_LABELS[item.kind]}</span>
+        {item.modality && item.modality !== "presencial" ? (
+          <span>· {MODALITY_LABELS[item.modality]}</span>
+        ) : null}
+        {item.allow_overlap ? <span>· Paralelo</span> : null}
         {item.buffer_before_minutes > 0 || item.buffer_after_minutes > 0 ? (
           <span>
-            · Buffer {item.buffer_before_minutes}m / {item.buffer_after_minutes}m
+            · Intervalo {item.buffer_before_minutes}m / {item.buffer_after_minutes}m
           </span>
         ) : null}
       </div>
@@ -196,7 +201,7 @@ export function ProtectedSleepCard({
       {!compact ? (
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs opacity-90">
           <span className="break-words">
-            Bloqueado contra alocação automática ({preferences.timezone}).
+            Horário reservado para descanso; nada é agendado automaticamente aqui.
           </span>
           <Link
             href="/onboarding"

@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 
 from src.agents.analysis_planning_agent import AnalysisPlanningAgent
-from src.agents.llm import GroqLLM, LLMConfig, load_api_key
+from src.agents.llm import CallPacer, GroqLLM, LLMConfig, load_api_key
 from src.agents.orchestrator import MultiAgentOrchestrator
 from src.agents.research_agent import QdrantRetriever, ResearchAgent
 from src.agents.validation_agent import ValidationAgent
@@ -59,7 +59,14 @@ SessionDep = Annotated[SessionRecord, Depends(require_session)]
 
 
 class DefaultOrchestratorManager:
-    """Inicialização tardia e segura de QdrantRetriever + GroqLLM para /chat/query."""
+    """Inicialização tardia e segura de QdrantRetriever + GroqLLM para /chat/query.
+
+    Mantém um `CallPacer` compartilhado entre requisições HTTP para respeitar o
+    intervalo mínimo entre chamadas à Groq (evitando estouros HTTP 429 em sequência).
+    """
+
+    def __init__(self, pacer: CallPacer | None = None) -> None:
+        self._pacer = pacer or CallPacer()
 
     def get(
         self, scope: str = "demo", user_id: str | None = None
@@ -85,8 +92,10 @@ class DefaultOrchestratorManager:
                 "Nenhuma resposta foi inventada."
             ) from exc
 
-        min_interval = float(os.getenv("VEZO_LLM_MIN_CALL_INTERVAL", "0"))
+        min_interval = max(0.0, float(os.getenv("VEZO_LLM_MIN_CALL_INTERVAL", "5")))
         llm = GroqLLM(LLMConfig(min_call_interval=min_interval))
+        if hasattr(llm, "set_pacer"):
+            llm.set_pacer(self._pacer)
         orchestrator = MultiAgentOrchestrator(
             ResearchAgent(retriever, llm),
             AnalysisPlanningAgent(llm),

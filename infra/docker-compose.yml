@@ -71,7 +71,7 @@ services:
       VEZO_DB_PATH: /data/vezo.db
       VEZO_CORS_ORIGINS: ${VEZO_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       VEZO_COOKIE_SECURE: ${VEZO_COOKIE_SECURE:-false}
-      VEZO_LLM_MIN_CALL_INTERVAL: ${VEZO_LLM_MIN_CALL_INTERVAL:-0}
+      VEZO_LLM_MIN_CALL_INTERVAL: ${VEZO_LLM_MIN_CALL_INTERVAL:-5}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
     depends_on:
       qdrant:

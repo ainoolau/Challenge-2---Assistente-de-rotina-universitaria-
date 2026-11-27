@@ -14,11 +14,18 @@ import type { FieldError } from "@/lib/api";
 import type {
   PreferencesUpdateRequest,
   ScheduleItemCreate,
+  ScheduleModality,
   SessionCreateRequest,
   SessionPreferences,
 } from "@/types/api";
 
-import { buildZonedIso, getWeekKeys, toDateKey } from "../routine/schedule-utils";
+import {
+  addDaysToKey,
+  buildZonedIso,
+  formatDayHeader,
+  getWeekKeys,
+  toDateKey,
+} from "../routine/schedule-utils";
 
 // ---------------------------------------------------------------------------
 // Tipos do rascunho
@@ -26,8 +33,11 @@ import { buildZonedIso, getWeekKeys, toDateKey } from "../routine/schedule-utils
 
 export const DEFAULT_TIMEZONE = "America/Sao_Paulo";
 
-/** Tipos aceitos no onboarding. "other" é apresentado como "Prazo / meta". */
+/** Tipos aceitos no onboarding. */
 export type CommitmentKind = "class" | "work" | "commute" | "other";
+
+/** Frequência do compromisso no onboarding: recorrente na semana ou em data única. */
+export type CommitmentFrequency = "weekly" | "once";
 
 export interface WellbeingDraft {
   timezone: string;
@@ -43,12 +53,17 @@ export interface CommitmentDraft {
   id: string;
   kind: CommitmentKind;
   label: string;
-  /** Índices 0 (segunda) a 6 (domingo) da semana atual. */
+  frequency: CommitmentFrequency;
+  /** Índices 0 (segunda) a 6 (domingo) da semana atual (usado quando frequency === "weekly"). */
   weekdays: number[];
+  /** Data específica "YYYY-MM-DD" (usada quando frequency === "once"). */
+  dateKey: string;
   /** "HH:MM" */
   startTime: string;
   /** "HH:MM" */
   endTime: string;
+  modality: ScheduleModality;
+  allowOverlap: boolean;
 }
 
 export type StepId = "consent" | "wellbeing" | "commitments" | "review";
@@ -61,18 +76,27 @@ export const STEPS: readonly { id: StepId; title: string; short: string }[] = [
 ] as const;
 
 export const KIND_OPTIONS: readonly { value: CommitmentKind; label: string; hint: string }[] = [
-  { value: "class", label: "Aula", hint: "Disciplinas e laboratórios" },
-  { value: "work", label: "Trabalho / Residência", hint: "Emprego, estágio, plantão" },
-  { value: "commute", label: "Deslocamento", hint: "Ônibus, metrô, trânsito" },
-  { value: "other", label: "Prazo / meta", hint: "Entrega, prova, tarefa com data" },
+  { value: "class", label: "Aula", hint: "Disciplinas, laboratórios ou monitorias" },
+  { value: "work", label: "Trabalho", hint: "Emprego, estágio ou plantão" },
+  { value: "commute", label: "Deslocamento", hint: "Trajeto de ônibus, metrô ou carro" },
+  { value: "other", label: "Outro compromisso", hint: "Provas, consultas, entregas ou eventos" },
 ] as const;
 
 export const KIND_LABEL: Record<CommitmentKind, string> = {
   class: "Aula",
-  work: "Trabalho / Residência",
+  work: "Trabalho",
   commute: "Deslocamento",
-  other: "Prazo / meta",
+  other: "Outro compromisso",
 };
+
+export const FREQUENCY_OPTIONS: readonly {
+  value: CommitmentFrequency;
+  label: string;
+  hint: string;
+}[] = [
+  { value: "weekly", label: "Toda semana", hint: "Repete nos dias escolhidos" },
+  { value: "once", label: "Data específica", hint: "Prova, consulta ou evento pontual" },
+] as const;
 
 export const WEEKDAYS: readonly { short: string; long: string }[] = [
   { short: "Seg", long: "segunda-feira" },
@@ -87,18 +111,22 @@ export const WEEKDAYS: readonly { short: string; long: string }[] = [
 export const MAX_BLOCK_OPTIONS = [30, 45, 60, 90, 120] as const;
 export const BUFFER_OPTIONS = [0, 10, 15, 30] as const;
 
-/** Fusos brasileiros mais comuns; o fuso detectado no navegador é somado à lista. */
+/** Fusos brasileiros mais comuns com rótulos amigáveis; o valor interno segue padrão IANA. */
 const BRAZIL_TIMEZONES: readonly { value: string; label: string }[] = [
-  { value: "America/Sao_Paulo", label: "Brasília (America/Sao_Paulo)" },
-  { value: "America/Manaus", label: "Amazonas (America/Manaus)" },
-  { value: "America/Cuiaba", label: "Mato Grosso (America/Cuiaba)" },
-  { value: "America/Belem", label: "Pará (America/Belem)" },
-  { value: "America/Fortaleza", label: "Ceará (America/Fortaleza)" },
-  { value: "America/Recife", label: "Pernambuco (America/Recife)" },
-  { value: "America/Bahia", label: "Bahia (America/Bahia)" },
-  { value: "America/Rio_Branco", label: "Acre (America/Rio_Branco)" },
-  { value: "America/Noronha", label: "Fernando de Noronha (America/Noronha)" },
+  { value: "America/Sao_Paulo", label: "Horário de Brasília" },
+  { value: "America/Manaus", label: "Amazonas" },
+  { value: "America/Cuiaba", label: "Mato Grosso" },
+  { value: "America/Belem", label: "Pará" },
+  { value: "America/Fortaleza", label: "Ceará" },
+  { value: "America/Recife", label: "Pernambuco" },
+  { value: "America/Bahia", label: "Bahia" },
+  { value: "America/Rio_Branco", label: "Acre" },
+  { value: "America/Noronha", label: "Fernando de Noronha" },
 ];
+
+export function formatTimezoneLabel(value: string): string {
+  return BRAZIL_TIMEZONES.find((item) => item.value === value)?.label ?? value;
+}
 
 export function timezoneOptions(current: string): { value: string; label: string }[] {
   const options = [...BRAZIL_TIMEZONES];
@@ -158,47 +186,77 @@ export function newCommitmentId(): string {
   return `c${Date.now().toString(36)}${idCounter}`;
 }
 
-export function emptyCommitment(kind: CommitmentKind = "class"): CommitmentDraft {
-  return { id: newCommitmentId(), kind, label: "", weekdays: [], startTime: "", endTime: "" };
+export function emptyCommitment(
+  kind: CommitmentKind = "class",
+  defaultDateKey = "",
+): CommitmentDraft {
+  return {
+    id: newCommitmentId(),
+    kind,
+    label: "",
+    frequency: kind === "other" ? "once" : "weekly",
+    weekdays: [],
+    dateKey: defaultDateKey,
+    startTime: "",
+    endTime: "",
+    modality: "presencial",
+    allowOverlap: false,
+  };
 }
 
 /**
- * Cenário fictício de multijornada para teste rápido (residência + aulas noturnas
- * + deslocamento + uma entrega). Nenhum dado pessoal real.
+ * Cenário fictício de multijornada para teste rápido (trabalho + aulas noturnas
+ * + deslocamento + um compromisso pontual). Nenhum dado pessoal real.
  */
-export function exampleScenario(): CommitmentDraft[] {
+export function exampleScenario(defaultDateKey: string): CommitmentDraft[] {
   return [
     {
       id: newCommitmentId(),
       kind: "commute",
-      label: "Ônibus até o hospital",
+      label: "Trajeto até o trabalho",
+      frequency: "weekly",
       weekdays: [0, 2, 4],
+      dateKey: defaultDateKey,
       startTime: "06:20",
       endTime: "07:00",
+      modality: "presencial",
+      allowOverlap: false,
     },
     {
       id: newCommitmentId(),
       kind: "work",
-      label: "Plantão da residência",
+      label: "Expediente de estágio",
+      frequency: "weekly",
       weekdays: [0, 2, 4],
+      dateKey: defaultDateKey,
       startTime: "07:00",
       endTime: "13:00",
+      modality: "presencial",
+      allowOverlap: false,
     },
     {
       id: newCommitmentId(),
       kind: "class",
-      label: "Aula de Farmacologia",
+      label: "Aula de Estatística",
+      frequency: "weekly",
       weekdays: [1, 3],
+      dateKey: defaultDateKey,
       startTime: "19:00",
       endTime: "21:30",
+      modality: "presencial",
+      allowOverlap: false,
     },
     {
       id: newCommitmentId(),
       kind: "other",
-      label: "Entrega do relatório de estágio",
-      weekdays: [4],
-      startTime: "18:00",
-      endTime: "19:00",
+      label: "Consulta médica",
+      frequency: "once",
+      weekdays: [],
+      dateKey: addDaysToKey(defaultDateKey, 2),
+      startTime: "16:00",
+      endTime: "17:00",
+      modality: "presencial",
+      allowOverlap: false,
     },
   ];
 }
@@ -228,14 +286,19 @@ export function validateWellbeing(
   return errors;
 }
 
-export type CommitmentField = "label" | "weekdays" | "startTime" | "endTime";
+export type CommitmentField = "label" | "weekdays" | "dateKey" | "startTime" | "endTime";
 
 export function validateCommitment(draft: CommitmentDraft): FieldErrors<CommitmentField> {
   const errors: FieldErrors<CommitmentField> = {};
   const label = draft.label.trim();
   if (!label) errors.label = "Dê um nome ao compromisso.";
   else if (label.length > 200) errors.label = "Use no máximo 200 caracteres.";
-  if (draft.weekdays.length === 0) errors.weekdays = "Selecione pelo menos um dia.";
+  if (draft.frequency === "weekly" && draft.weekdays.length === 0) {
+    errors.weekdays = "Selecione pelo menos um dia.";
+  }
+  if (draft.frequency === "once" && !draft.dateKey) {
+    errors.dateKey = "Escolha a data do compromisso.";
+  }
   if (!draft.startTime) errors.startTime = "Informe o horário de início.";
   if (!draft.endTime) errors.endTime = "Informe o horário de término.";
   if (draft.startTime && draft.endTime && draft.endTime <= draft.startTime) {
@@ -279,20 +342,30 @@ export function toPreferencesUpdate(
   };
 }
 
-/** Chave estável de uma ocorrência (compromisso + dia da semana). */
-export const occurrenceKey = (commitmentId: string, weekday: number) =>
-  `${commitmentId}|${weekday}`;
+/** Chave estável de uma ocorrência (compromisso + dia da semana ou data específica). */
+export const occurrenceKey = (commitmentId: string, slot: string | number) =>
+  `${commitmentId}|${slot}`;
 
 export interface Occurrence {
   key: string;
   commitmentId: string;
-  weekday: number;
+  slotLabel: string;
   payload: ScheduleItemCreate;
 }
 
+/** Retorna todas as chaves de ocorrência previstas para um compromisso. */
+export function commitmentOccurrenceKeys(commitment: CommitmentDraft): string[] {
+  if (commitment.frequency === "once") {
+    return commitment.dateKey ? [occurrenceKey(commitment.id, commitment.dateKey)] : [];
+  }
+  return [...commitment.weekdays]
+    .sort((a, b) => a - b)
+    .map((weekday) => occurrenceKey(commitment.id, weekday));
+}
+
 /**
- * Expande cada compromisso nos dias selecionados da semana atual (segunda a
- * domingo, no fuso escolhido), já com offset explícito exigido pela API.
+ * Expande cada compromisso nos dias selecionados (semanal na semana atual ou
+ * data única escolhida), já com offset explícito exigido pela API.
  */
 export function expandOccurrences(
   commitments: CommitmentDraft[],
@@ -302,17 +375,39 @@ export function expandOccurrences(
   const weekKeys = getWeekKeys(toDateKey(now, timezone));
   const occurrences: Occurrence[] = [];
   for (const commitment of commitments) {
+    if (commitment.frequency === "once") {
+      if (!commitment.dateKey) continue;
+      const header = formatDayHeader(commitment.dateKey);
+      occurrences.push({
+        key: occurrenceKey(commitment.id, commitment.dateKey),
+        commitmentId: commitment.id,
+        slotLabel: `${header.weekdayShort} ${header.dayMonth}`,
+        payload: {
+          label: commitment.label.trim(),
+          kind: commitment.kind,
+          fixed: true,
+          modality: commitment.modality,
+          allow_overlap: commitment.allowOverlap,
+          start: buildZonedIso(commitment.dateKey, commitment.startTime, timezone),
+          end: buildZonedIso(commitment.dateKey, commitment.endTime, timezone),
+        },
+      });
+      continue;
+    }
+
     for (const weekday of [...commitment.weekdays].sort((a, b) => a - b)) {
       const dateKey = weekKeys[weekday];
       if (!dateKey) continue;
       occurrences.push({
         key: occurrenceKey(commitment.id, weekday),
         commitmentId: commitment.id,
-        weekday,
+        slotLabel: WEEKDAYS[weekday]?.short ?? "",
         payload: {
           label: commitment.label.trim(),
           kind: commitment.kind,
           fixed: true,
+          modality: commitment.modality,
+          allow_overlap: commitment.allowOverlap,
           start: buildZonedIso(dateKey, commitment.startTime, timezone),
           end: buildZonedIso(dateKey, commitment.endTime, timezone),
         },
@@ -320,6 +415,15 @@ export function expandOccurrences(
     }
   }
   return occurrences;
+}
+
+export function formatCommitmentSchedule(commitment: CommitmentDraft): string {
+  if (commitment.frequency === "once") {
+    if (!commitment.dateKey) return "Data a definir";
+    const header = formatDayHeader(commitment.dateKey);
+    return `${header.weekdayShort} · ${header.dayMonth}`;
+  }
+  return formatWeekdays(commitment.weekdays);
 }
 
 export function formatWeekdays(weekdays: number[]): string {

@@ -97,21 +97,33 @@ def protected_slots(request: PlanningContext) -> list[ScheduleSlot]:
 def _effective_blocked_bounds(
     slot: ScheduleSlot, global_buffer_minutes: int
 ) -> tuple[float, float]:
-    """Retorna intervalo bloqueado (em segundos epoch) incluindo buffers de eventos fixos."""
+    """Retorna intervalo bloqueado (em segundos epoch) incluindo buffers de eventos fixos.
+
+    Compromissos remotos (`modality == "remoto"`) não exigem deslocamento e portanto
+    não herdam `global_buffer_minutes`, respeitando apenas buffers explícitos do item.
+    """
     if slot.kind == "sleep":
         return slot.start.timestamp(), slot.end.timestamp()
-    before_sec = max(global_buffer_minutes, slot.buffer_before_minutes) * 60
-    after_sec = max(global_buffer_minutes, slot.buffer_after_minutes) * 60
+    if slot.modality == "remoto":
+        before_sec = slot.buffer_before_minutes * 60
+        after_sec = slot.buffer_after_minutes * 60
+    else:
+        before_sec = max(global_buffer_minutes, slot.buffer_before_minutes) * 60
+        after_sec = max(global_buffer_minutes, slot.buffer_after_minutes) * 60
     return slot.start.timestamp() - before_sec, slot.end.timestamp() + after_sec
 
 
 def detect_input_conflicts(slots: list[ScheduleSlot]) -> list[str]:
-    """Detecta conflitos pré-existentes entre compromissos fixos sem movê-los."""
+    """Detecta conflitos pré-existentes entre compromissos fixos sem movê-los.
+
+    Pares em que ao menos um compromisso possui `allow_overlap=True` coexistem
+    como atividades paralelas permitidas e não disparam alerta de conflito.
+    """
     return [
         f"Compromissos fixos sobrepostos: {a.label} / {b.label} ({max(a.start, b.start).isoformat()})"
         for i, a in enumerate(slots)
         for b in slots[i + 1 :]
-        if overlaps(a, b)
+        if overlaps(a, b) and not (a.allow_overlap or b.allow_overlap)
     ]
 
 
@@ -181,6 +193,7 @@ def _allocate_goals_into_windows(
     buffer_minutes: int,
     max_block_minutes: int,
     min_block_minutes: int,
+    priority_first: bool = False,
 ) -> tuple[list[ProposedBlock], list[Unallocated]]:
     """Aloca metas em blocos determinísticos respeitando prazo, prioridade, duração e buffers."""
     blocks: list[ProposedBlock] = []
@@ -191,10 +204,15 @@ def _allocate_goals_into_windows(
     min_sec = min_block_minutes * 60
 
     current_free = list(free)
-    for goal in sorted(
+    ordered_goals = sorted(
         goals,
-        key=lambda g: (g.deadline.timestamp(), -g.priority, g.goal_id),
-    ):
+        key=(
+            (lambda g: (-g.priority, g.deadline.timestamp(), g.goal_id))
+            if priority_first
+            else (lambda g: (g.deadline.timestamp(), -g.priority, g.goal_id))
+        ),
+    )
+    for goal in ordered_goals:
         remaining = goal.duration_minutes * 60
         goal_min_sec = min(min_sec, remaining)
         deadline_ts = goal.deadline.timestamp()
@@ -490,45 +508,117 @@ def rebalance(request: RebalanceRequest) -> RebalanceProposal:
         else:
             disrupted.append((block, reason))
 
-    # Monta metas pendentes apenas para minutos ainda não cobertos pelos blocos preservados.
-    pending_goals: list[StudyGoal] = []
-    for goal in goals_map.values():
-        needed_seconds = goal.duration_minutes * 60 - kept_seconds_by_goal[goal.goal_id]
-        if needed_seconds > 0:
-            pending_goals.append(
-                goal.model_copy(
-                    update={"duration_minutes": max(1, needed_seconds // 60)}
+    def _run_allocation(
+        current_kept: list[ProposedBlock], *, priority_first: bool = False
+    ) -> tuple[list[ProposedBlock], list[Unallocated]]:
+        kept_secs: dict[str, int] = defaultdict(int)
+        for blk in current_kept:
+            kept_secs[blk.goal_id] += int(
+                round(blk.end.timestamp() - blk.start.timestamp())
+            )
+        pending: list[StudyGoal] = []
+        for goal in goals_map.values():
+            needed = goal.duration_minutes * 60 - kept_secs[goal.goal_id]
+            if needed > 0:
+                pending.append(
+                    goal.model_copy(update={"duration_minutes": max(1, needed // 60)})
+                )
+
+        buffer_sec = request.buffer_minutes * 60
+        busy_intervals = [
+            _effective_blocked_bounds(slot, request.buffer_minutes)
+            for slot in [*all_fixed, *sleep_slots]
+        ]
+        for kept_block in current_kept:
+            busy_intervals.append(
+                (
+                    kept_block.start.timestamp() - buffer_sec,
+                    kept_block.end.timestamp() + buffer_sec,
                 )
             )
-
-    # Janelas livres descontam sono, fixos + imprevistos (com buffer) e blocos mantidos (com buffer).
-    buffer_sec = request.buffer_minutes * 60
-    busy_intervals = [
-        _effective_blocked_bounds(slot, request.buffer_minutes)
-        for slot in [*all_fixed, *sleep_slots]
-    ]
-    for kept_block in kept:
-        busy_intervals.append(
-            (
-                kept_block.start.timestamp() - buffer_sec,
-                kept_block.end.timestamp() + buffer_sec,
-            )
+        free = _subtract_intervals(
+            request.horizon.start.timestamp(),
+            request.horizon.end.timestamp(),
+            busy_intervals,
+        )
+        return _allocate_goals_into_windows(
+            pending,
+            free,
+            timezone=request.timezone,
+            buffer_minutes=request.buffer_minutes,
+            max_block_minutes=request.max_block_minutes,
+            min_block_minutes=request.min_block_minutes,
+            priority_first=priority_first,
         )
 
-    free = _subtract_intervals(
-        request.horizon.start.timestamp(),
-        request.horizon.end.timestamp(),
-        busy_intervals,
-    )
+    def _priority_unallocated_vector(
+        unalloc: list[Unallocated],
+    ) -> tuple[int, int, int, int, int]:
+        by_prio = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0}
+        for item in unalloc:
+            prio = goals_map[item.goal_id].priority
+            by_prio[prio] = by_prio.get(prio, 0) + item.remaining_minutes
+        return (by_prio[5], by_prio[4], by_prio[3], by_prio[2], by_prio[1])
 
-    newly_allocated, unallocated = _allocate_goals_into_windows(
-        pending_goals,
-        free,
-        timezone=request.timezone,
-        buffer_minutes=request.buffer_minutes,
-        max_block_minutes=request.max_block_minutes,
-        min_block_minutes=request.min_block_minutes,
-    )
+    newly_allocated, unallocated = _run_allocation(kept, priority_first=False)
+
+    # Preempção controlada por prioridade (TASK-F1-07): se uma meta de prioridade
+    # superior ficou com tempo não alocado antes do prazo, desloca blocos flexíveis
+    # de prioridade estritamente menor que ocupam janelas úteis antes desse prazo.
+    while unallocated and kept:
+        top_unalloc = min(
+            unallocated,
+            key=lambda u: (
+                -goals_map[u.goal_id].priority,
+                goals_map[u.goal_id].deadline.timestamp(),
+                u.goal_id,
+            ),
+        )
+        top_goal = goals_map[top_unalloc.goal_id]
+        candidates = [
+            idx
+            for idx, blk in enumerate(kept)
+            if goals_map[blk.goal_id].priority < top_goal.priority
+            and blk.start.timestamp() < top_goal.deadline.timestamp()
+        ]
+        if not candidates:
+            break
+
+        candidates.sort(
+            key=lambda idx: (
+                goals_map[kept[idx].goal_id].priority,
+                -goals_map[kept[idx].goal_id].deadline.timestamp(),
+                -kept[idx].start.timestamp(),
+            )
+        )
+        current_score = _priority_unallocated_vector(unallocated)
+        improved = False
+
+        # Tenta liberar 1 bloco (ou prefixo mínimo de blocos menores) que melhore
+        # estritamente o atendimento das metas de maior prioridade.
+        removed_indices: list[int] = []
+        for idx in candidates:
+            removed_indices.append(idx)
+            removed_set = set(removed_indices)
+            trial_kept = [blk for i, blk in enumerate(kept) if i not in removed_set]
+            trial_alloc, trial_unalloc = _run_allocation(
+                trial_kept, priority_first=True
+            )
+            if _priority_unallocated_vector(trial_unalloc) < current_score:
+                preempt_reason = (
+                    f"Realocado para priorizar '{top_goal.title}' "
+                    f"(prioridade {top_goal.priority}) antes do prazo"
+                )
+                for rem_idx in sorted(removed_indices):
+                    disrupted.append((kept[rem_idx], preempt_reason))
+                kept = trial_kept
+                newly_allocated = trial_alloc
+                unallocated = trial_unalloc
+                improved = True
+                break
+
+        if not improved:
+            break
 
     # Construção do diff exato (`moved`, `removed`, `added`, `kept`).
     disrupted_by_goal: dict[str, list[tuple[ProposedBlock, str]]] = defaultdict(list)

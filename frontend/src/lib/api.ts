@@ -31,6 +31,7 @@ import type {
   SessionCreateRequest,
   SessionPreferences,
   SessionResponse,
+  StudyGoal,
   ValidationErrorItem,
 } from "@/types/api";
 
@@ -278,6 +279,15 @@ export const api = {
         body: form,
       });
     },
+  },
+
+  goals: {
+    list: (signal?: AbortSignal) =>
+      apiRequest<StudyGoal[]>("/goals", { signal }),
+    create: (body: StudyGoal) =>
+      apiRequest<StudyGoal>("/goals", { method: "POST", body }),
+    remove: (goalId: string) =>
+      apiRequest<void>(`/goals/${enc(goalId)}`, { method: "DELETE" }),
   },
 
   chat: {

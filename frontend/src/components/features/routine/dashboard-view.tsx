@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import type {
   Interval,
   OptimizeScheduleRequest,
+  ProposedBlock,
   ReallocateScheduleRequest,
   ScheduleItemResponse,
   ScheduleListResponse,
@@ -48,9 +49,11 @@ import {
   addDaysToKey,
   buildHorizonForDay,
   buildHorizonForWeek,
+  buildPlanningHorizon,
   classifyConflictError,
   durationMinutes,
   extractProposedBlocks,
+  filterUpcomingFreeWindows,
   formatDayHeader,
   getDayLoad,
   getMonthGridKeys,
@@ -85,6 +88,44 @@ type BannerFeedback = {
   title: string;
   description: string;
 };
+
+type DayTimelineEntry =
+  | { kind: "item"; startMs: number; key: string; item: ScheduleItemResponse }
+  | { kind: "proposed"; startMs: number; key: string; block: ProposedBlock }
+  | { kind: "free"; startMs: number; key: string; window: Interval };
+
+function buildDayTimeline(
+  dayKey: string,
+  items: ScheduleItemResponse[],
+  proposed: ProposedBlock[],
+  free: Interval[],
+  showFree: boolean,
+): DayTimelineEntry[] {
+  const entries: DayTimelineEntry[] = [
+    ...items.map((item) => ({
+      kind: "item" as const,
+      startMs: new Date(item.start).getTime(),
+      key: `item-${item.item_id}`,
+      item,
+    })),
+    ...proposed.map((block, idx) => ({
+      kind: "proposed" as const,
+      startMs: new Date(block.start).getTime(),
+      key: `prop-${block.goal_id}-${dayKey}-${idx}`,
+      block,
+    })),
+    ...(showFree
+      ? free.map((win, idx) => ({
+          kind: "free" as const,
+          startMs: new Date(win.start).getTime(),
+          key: `free-${dayKey}-${idx}`,
+          window: win,
+        }))
+      : []),
+  ];
+  entries.sort((a, b) => a.startMs - b.startMs);
+  return entries;
+}
 
 /**
  * Dashboard de Rotina (TASK-F1-05 / #48).
@@ -208,10 +249,26 @@ function AuthenticatedRoutine({
     return buildHorizonForWeek(weekKeys, timeZone);
   }, [viewMode, anchorDateKey, weekKeys, timeZone]);
 
-  const weekHorizon = useMemo<Interval>(
-    () => buildHorizonForWeek(weekKeys, timeZone),
+  const planningWindow = useMemo(
+    () => buildPlanningHorizon(weekKeys, timeZone),
     [weekKeys, timeZone],
   );
+
+  // Carrega metas de estudo persistidas na sessão (sobrevivem ao reload).
+  useEffect(() => {
+    const controller = new AbortController();
+    api.goals
+      .list(controller.signal)
+      .then((persisted) => {
+        if (!controller.signal.aborted) {
+          setGoals(persisted);
+        }
+      })
+      .catch(() => {
+        // Silencioso: falhas de sessão/rede já são tratadas no carregamento principal.
+      });
+    return () => controller.abort();
+  }, [reloadTick]);
 
   // Carrega GET /schedule?horizon_start=...&horizon_end=...
   useEffect(() => {
@@ -278,9 +335,14 @@ function AuthenticatedRoutine({
     [proposedBlocks, timeZone],
   );
 
-  const freeWindowsByDay = useMemo(
-    () => groupByDateKey(schedule?.free_windows ?? [], timeZone),
+  const upcomingFreeWindows = useMemo(
+    () => filterUpcomingFreeWindows(schedule?.free_windows ?? [], timeZone),
     [schedule?.free_windows, timeZone],
+  );
+
+  const freeWindowsByDay = useMemo(
+    () => groupByDateKey(upcomingFreeWindows, timeZone),
+    [upcomingFreeWindows, timeZone],
   );
 
   const goalDeadlinesByDay = useMemo(() => {
@@ -311,14 +373,48 @@ function AuthenticatedRoutine({
     setItemDialogOpen(true);
   }
 
+  async function handleAddGoal(goal: StudyGoal) {
+    setGoals((prev) => [...prev, goal]);
+    setOptimizeError(null);
+    try {
+      const saved = await api.goals.create(goal);
+      setGoals((prev) => prev.map((g) => (g.goal_id === goal.goal_id ? saved : g)));
+    } catch (err) {
+      setGoals((prev) => prev.filter((g) => g.goal_id !== goal.goal_id));
+      setOptimizeError(
+        isApiError(err) ? err.message : "Não foi possível salvar a meta de estudo.",
+      );
+    }
+  }
+
+  async function handleRemoveGoal(goalId: string) {
+    const previous = goals;
+    setGoals((prev) => prev.filter((item) => item.goal_id !== goalId));
+    try {
+      await api.goals.remove(goalId);
+    } catch (err) {
+      setGoals(previous);
+      setOptimizeError(
+        isApiError(err) ? err.message : "Não foi possível remover a meta de estudo.",
+      );
+    }
+  }
+
   async function handleOptimizeWeek() {
     if (goals.length === 0) return;
+    const freshWindow = buildPlanningHorizon(weekKeys, timeZone);
+    if (freshWindow.isPastWeek) {
+      setOptimizeError(
+        "Esta semana já passou. Avance para a semana atual ou futura para otimizar.",
+      );
+      return;
+    }
     setOptimizing(true);
     setOptimizeError(null);
     setProposalError(null);
 
     const request: OptimizeScheduleRequest = {
-      horizon: weekHorizon,
+      horizon: freshWindow.horizon,
       study_goals: goals,
     };
 
@@ -353,7 +449,7 @@ function AuthenticatedRoutine({
       setLastRequest(null);
       setFeedback({
         variant: "success",
-        title: `Proposta aplicada (agenda v${res.schedule_version})`,
+        title: "Proposta aplicada na sua agenda",
         description: res.message,
       });
       triggerReload();
@@ -408,7 +504,7 @@ function AuthenticatedRoutine({
       setPendingProposal(next);
       setFeedback({
         variant: "warning",
-        title: `Proposta recalculada na versão v${next.base_version}`,
+        title: "Nova proposta calculada",
         description: "Revise os novos blocos tracejados antes de confirmar.",
       });
     } catch (err) {
@@ -463,17 +559,14 @@ function AuthenticatedRoutine({
       {/* Barra de ações rápidas + resumo da agenda */}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant="outline" className="font-mono">
-            Agenda v{schedule.schedule_version}
-          </Badge>
           <Badge variant="secondary" className="font-mono">
-            {schedule.items.length} {schedule.items.length === 1 ? "item" : "itens"}
+            {schedule.items.length} {schedule.items.length === 1 ? "compromisso" : "compromissos"}
           </Badge>
-          {schedule.free_windows.length > 0 ? (
+          {upcomingFreeWindows.length > 0 ? (
             <Badge variant="outline">
               <Clock aria-hidden />
-              {schedule.free_windows.length}{" "}
-              {schedule.free_windows.length === 1 ? "janela livre" : "janelas livres"}
+              {upcomingFreeWindows.length}{" "}
+              {upcomingFreeWindows.length === 1 ? "horário livre" : "horários livres"}
             </Badge>
           ) : null}
         </div>
@@ -804,6 +897,7 @@ function AuthenticatedRoutine({
               );
               const load = getDayLoad(totalMins);
               const isToday = dayKey === todayKey;
+              const isPastDay = dayKey < todayKey;
 
               return (
                 <Card
@@ -811,6 +905,7 @@ function AuthenticatedRoutine({
                   className={cn(
                     "min-w-0 [--card-spacing:--spacing(3.5)] sm:[--card-spacing:--spacing(4)]",
                     isToday && "border-primary/60 ring-1 ring-primary/20",
+                    isPastDay && "opacity-75",
                   )}
                 >
                   <CardHeader className="pb-2">
@@ -821,6 +916,7 @@ function AuthenticatedRoutine({
                           <span className="font-mono">{header.dayMonth}</span>
                         </CardTitle>
                         {isToday ? <Badge variant="default">Hoje</Badge> : null}
+                        {isPastDay ? <Badge variant="outline">Passado</Badge> : null}
                       </div>
 
                       <div className="flex shrink-0 items-center gap-1.5">
@@ -839,42 +935,52 @@ function AuthenticatedRoutine({
                   </CardHeader>
 
                   <CardContent className="flex min-w-0 flex-col gap-2">
-                    {dayItems.map((item) => (
-                      <ScheduleSlotCard
-                        key={item.item_id}
-                        item={item}
-                        timeZone={timeZone}
-                        hasConflict={itemHasConflict(item, conflicts)}
-                        onSelect={openEditDialog}
-                      />
-                    ))}
-
-                    {dayProposed.map((block, idx) => (
-                      <ProposedSlotCard
-                        key={`${block.goal_id}-${dayKey}-${idx}`}
-                        block={block}
-                        timeZone={timeZone}
-                      />
-                    ))}
-
-                    {dayItems.length === 0 && dayProposed.length === 0 ? (
-                      <p className="rounded-md border border-dashed px-3 py-3 text-center text-xs text-muted-foreground">
-                        Sem compromissos neste dia.
-                      </p>
-                    ) : null}
-
-                    {showFreeWindows && dayFree.length > 0 ? (
-                      <div className="flex min-w-0 flex-col gap-1.5 pt-1">
-                        {dayFree.map((win, idx) => (
+                    {(() => {
+                      const timeline = buildDayTimeline(
+                        dayKey,
+                        dayItems,
+                        dayProposed,
+                        dayFree,
+                        showFreeWindows,
+                      );
+                      if (timeline.length === 0) {
+                        return (
+                          <p className="rounded-md border border-dashed px-3 py-3 text-center text-xs text-muted-foreground">
+                            Sem compromissos neste dia.
+                          </p>
+                        );
+                      }
+                      return timeline.map((entry) => {
+                        if (entry.kind === "item") {
+                          return (
+                            <ScheduleSlotCard
+                              key={entry.key}
+                              item={entry.item}
+                              timeZone={timeZone}
+                              hasConflict={itemHasConflict(entry.item, conflicts)}
+                              onSelect={openEditDialog}
+                            />
+                          );
+                        }
+                        if (entry.kind === "proposed") {
+                          return (
+                            <ProposedSlotCard
+                              key={entry.key}
+                              block={entry.block}
+                              timeZone={timeZone}
+                            />
+                          );
+                        }
+                        return (
                           <FreeWindowCard
-                            key={`${dayKey}-fw-${idx}`}
-                            window={win}
+                            key={entry.key}
+                            window={entry.window}
                             timeZone={timeZone}
                             onQuickAdd={openCreateFromFreeWindow}
                           />
-                        ))}
-                      </div>
-                    ) : null}
+                        );
+                      });
+                    })()}
 
                     <div className="pt-1">
                       <ProtectedSleepCard preferences={schedule.preferences} compact />
@@ -910,56 +1016,63 @@ function AuthenticatedRoutine({
                 </CardHeader>
 
                 <CardContent className="flex min-w-0 flex-col gap-2.5">
-                  {dayItems.length === 0 && dayProposed.length === 0 ? (
-                    <EmptyState
-                      icon={CalendarDays}
-                      title="Dia livre"
-                      description="Nenhum compromisso registrado nesta data. Use o botão abaixo ou uma janela livre para agendar."
-                      action={
-                        <Button
-                          type="button"
-                          onClick={() => openCreateDialog(anchorDateKey)}
-                        >
-                          <Plus aria-hidden />
-                          Adicionar compromisso
-                        </Button>
+                  {(() => {
+                    const timeline = buildDayTimeline(
+                      anchorDateKey,
+                      dayItems,
+                      dayProposed,
+                      dayFree,
+                      showFreeWindows,
+                    );
+                    if (timeline.length === 0) {
+                      return (
+                        <EmptyState
+                          icon={CalendarDays}
+                          title="Dia livre"
+                          description="Nenhum compromisso registrado nesta data. Use o botão abaixo para agendar."
+                          action={
+                            <Button
+                              type="button"
+                              onClick={() => openCreateDialog(anchorDateKey)}
+                            >
+                              <Plus aria-hidden />
+                              Adicionar compromisso
+                            </Button>
+                          }
+                        />
+                      );
+                    }
+                    return timeline.map((entry) => {
+                      if (entry.kind === "item") {
+                        return (
+                          <ScheduleSlotCard
+                            key={entry.key}
+                            item={entry.item}
+                            timeZone={timeZone}
+                            hasConflict={itemHasConflict(entry.item, conflicts)}
+                            onSelect={openEditDialog}
+                          />
+                        );
                       }
-                    />
-                  ) : null}
-
-                  {dayItems.map((item) => (
-                    <ScheduleSlotCard
-                      key={item.item_id}
-                      item={item}
-                      timeZone={timeZone}
-                      hasConflict={itemHasConflict(item, conflicts)}
-                      onSelect={openEditDialog}
-                    />
-                  ))}
-
-                  {dayProposed.map((block, idx) => (
-                    <ProposedSlotCard
-                      key={`${block.goal_id}-today-${idx}`}
-                      block={block}
-                      timeZone={timeZone}
-                    />
-                  ))}
-
-                  {showFreeWindows && dayFree.length > 0 ? (
-                    <div className="flex min-w-0 flex-col gap-1.5 pt-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Janelas livres reais (motor determinístico)
-                      </p>
-                      {dayFree.map((win, idx) => (
+                      if (entry.kind === "proposed") {
+                        return (
+                          <ProposedSlotCard
+                            key={entry.key}
+                            block={entry.block}
+                            timeZone={timeZone}
+                          />
+                        );
+                      }
+                      return (
                         <FreeWindowCard
-                          key={`today-fw-${idx}`}
-                          window={win}
+                          key={entry.key}
+                          window={entry.window}
                           timeZone={timeZone}
                           onQuickAdd={openCreateFromFreeWindow}
                         />
-                      ))}
-                    </div>
-                  ) : null}
+                      );
+                    });
+                  })()}
 
                   <div className="pt-2">
                     <ProtectedSleepCard preferences={schedule.preferences} />
@@ -1052,15 +1165,11 @@ function AuthenticatedRoutine({
         goals={goals}
         timeZone={timeZone}
         anchorDateKey={anchorDateKey}
+        isPastWeek={planningWindow.isPastWeek}
         optimizing={optimizing}
         optimizeError={optimizeError}
-        onAddGoal={(goal) => {
-          setGoals((prev) => [...prev, goal]);
-          setOptimizeError(null);
-        }}
-        onRemoveGoal={(goalId) =>
-          setGoals((prev) => prev.filter((item) => item.goal_id !== goalId))
-        }
+        onAddGoal={(goal) => void handleAddGoal(goal)}
+        onRemoveGoal={(goalId) => void handleRemoveGoal(goalId)}
         onOptimize={() => void handleOptimizeWeek()}
         onOpenReallocate={() => setReallocateOpen(true)}
       />
@@ -1087,8 +1196,8 @@ function AuthenticatedRoutine({
         open={reallocateOpen}
         onOpenChange={setReallocateOpen}
         preferences={schedule.preferences}
-        horizon={weekHorizon}
-        defaultDateKey={anchorDateKey}
+        horizon={planningWindow.horizon}
+        defaultDateKey={anchorDateKey < todayKey ? todayKey : anchorDateKey}
         studyGoals={goals}
         onProposalReady={(proposal, req) => {
           setPendingProposal(proposal);
@@ -1098,7 +1207,7 @@ function AuthenticatedRoutine({
             variant: "warning",
             title: "Proposta de rebalanceamento pronta para revisão",
             description:
-              "Confira o diff antes/depois abaixo. Nenhuma alteração foi salva até você confirmar.",
+              "Confira o antes e depois abaixo. Nenhuma alteração foi salva até você confirmar.",
           });
         }}
       />

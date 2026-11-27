@@ -14,6 +14,7 @@ from src.core.schemas import (
     PlanningProposal,
     ProposedBlock,
     RebalanceProposal,
+    ScheduleModality,
     ScheduleSlot,
     StudyGoal,
 )
@@ -34,9 +35,9 @@ class SessionPreferences(Contract):
     timezone: str = "America/Sao_Paulo"
     sleep_start: time = time(22)
     sleep_end: time = time(6)
-    buffer_minutes: int = Field(default=0, ge=0, le=120)
+    buffer_minutes: int = Field(default=10, ge=0, le=120)
     max_block_minutes: int = Field(default=60, ge=15, le=240)
-    min_block_minutes: int = Field(default=1, ge=1, le=60)
+    min_block_minutes: int = Field(default=30, ge=1, le=60)
     consent_accepted: bool = False
     consent_timestamp: str | None = None
 
@@ -64,9 +65,9 @@ class SessionCreateRequest(Contract):
     timezone: str = "America/Sao_Paulo"
     sleep_start: time = time(22)
     sleep_end: time = time(6)
-    buffer_minutes: int = Field(default=0, ge=0, le=120)
+    buffer_minutes: int = Field(default=10, ge=0, le=120)
     max_block_minutes: int = Field(default=60, ge=15, le=240)
-    min_block_minutes: int = Field(default=1, ge=1, le=60)
+    min_block_minutes: int = Field(default=30, ge=1, le=60)
     consent_accepted: bool = False
 
     @field_validator("timezone")
@@ -126,6 +127,8 @@ class ScheduleItemCreate(Interval):
     label: str = Field(min_length=1, max_length=200)
     kind: ScheduleItemKind = "other"
     fixed: bool = True
+    modality: ScheduleModality = "presencial"
+    allow_overlap: bool = False
     goal_id: str | None = Field(default=None, max_length=100)
     buffer_before_minutes: int = Field(default=0, ge=0, le=180)
     buffer_after_minutes: int = Field(default=0, ge=0, le=180)
@@ -137,6 +140,8 @@ class ScheduleItemUpdate(Contract):
     label: str | None = Field(default=None, min_length=1, max_length=200)
     kind: ScheduleItemKind | None = None
     fixed: bool | None = None
+    modality: ScheduleModality | None = None
+    allow_overlap: bool | None = None
     goal_id: str | None = Field(default=None, max_length=100)
     buffer_before_minutes: int | None = Field(default=None, ge=0, le=180)
     buffer_after_minutes: int | None = Field(default=None, ge=0, le=180)
@@ -147,6 +152,8 @@ class ScheduleItemResponse(Interval):
     label: str
     kind: ScheduleItemKind
     fixed: bool
+    modality: ScheduleModality = "presencial"
+    allow_overlap: bool = False
     goal_id: str | None = None
     buffer_before_minutes: int = 0
     buffer_after_minutes: int = 0
