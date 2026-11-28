@@ -42,11 +42,11 @@ Todas as 5 trilhas abaixo estão priorizadas para execução imediata rumo à en
 - [ ] `A-04` (`P0`): Evoluir `.github/workflows/ci.yml` para esteira modular com matrizes, gate jobs e `$GITHUB_STEP_SUMMARY`.
 
 ### Trilha B — Qualidade do RAG & Consolidação do Benchmark (`src/data_pipeline/`, `scripts/scenarios/`)
-- [ ] `B-01` (`P0`): Implementar **Chunking Estrutural** na ingestão:
+- [x] `B-01` (`P0`): Implementar **Chunking Estrutural** na ingestão (`#80`, `INGESTION_VERSION = "3.0.2"`):
   - Separar `perfis_rotina_forms.txt` por delimitador de perfil/estudante (eliminando mistura de perfis como em `GS-10`);
   - Preservar linhas completas de tabelas/calendários e cláusulas de editais (atacando lacunas em `GS-01`, `GS-05`, `GS-06`, `GS-08`);
-  - Ajustar janela de textos longos (`800–1000` chars com `15–20%` overlap respeitando limite de tokens do MiniLM).
-- [ ] `B-02` (`P0`): Implementar **Contextual Retrieval** adicionando cabeçalho estruturado (`[Documento: ... | Seção/Perfil: ...]`) em cada chunk antes de vetorizar.
+  - Ajustar janela estrutural (`900` chars / `160` overlap) com controle real de tokens (`MAX_EMBEDDING_TOKENS = 128` do MiniLM).
+- [x] `B-02` (`P0`): Implementar **Contextual Retrieval** adicionando cabeçalho estruturado (`[Documento: ... | Perfil/Seção/Localização: ...]`) em cada chunk antes de vetorizar (`#80`).
 - [ ] `B-03` (`P1`): Implementar **busca em duas etapas com Reranking** (Qdrant Top-10 → Cross-Encoder Reranker → Top-3) e recalibrar o limiar do guardrail.
 - [ ] `B-04` (`P1`): Consolidar **`TASK-S3-05`** — reexecutar Cenário 2 (`retrieval_only`) sobre o Golden Set v1.0.0 e gerar relatório comparativo final dos 4 cenários (incluindo impacto antes/depois do chunking estrutural).
 

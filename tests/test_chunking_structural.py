@@ -77,3 +77,44 @@ def test_form_field_isolation():
     assert all(not ("aluno_01" in b and "aluno_02" in b) for b in blocks)
     assert all("Perfil Estudante" in b for b in blocks)
     assert sum("Maior Gargalo na Gestão da Rotina:" in b for b in blocks) == 2
+
+
+def test_long_numbered_clause_does_not_overflow_header_token_budget():
+    token = FakeTokenizer()
+    long_clause = "1. " + ("de " * 130)
+    long_article = "Art. 5 " + ("norma " * 130)
+    long_source = "edital_muito_extenso_" + ("documento_" * 12) + ".pdf"
+
+    for content in (long_clause, long_article):
+        chunks = dividir_segmentos(
+            [("p. 4", content)],
+            task_type="texto",
+            source=long_source,
+            tokenizer=token,
+        )
+        assert len(chunks) > 1
+        assert all(
+            len(token.encode(chunk.text, add_special_tokens=True)) <= 128
+            for chunk in chunks
+        )
+        assert all("Localização: p. 4]" in chunk.text for chunk in chunks)
+
+
+def test_real_perfis_rotina_forms_never_mixes_students():
+    import re
+    from pathlib import Path
+
+    sample = Path("data/samples/perfis_rotina_forms.txt")
+    if not sample.exists():
+        return
+    raw = sample.read_text(encoding="utf-8-sig")
+    chunks = dividir_segmentos(
+        [("p. 1", raw)],
+        task_type="texto",
+        source=sample.name,
+        tokenizer=FakeTokenizer(),
+    )
+    assert len(chunks) >= 8
+    for chunk in chunks:
+        alunos = set(re.findall(r"aluno_0[1-8]", chunk.text))
+        assert len(alunos) <= 1, f"Perfis misturados no mesmo chunk: {alunos}"

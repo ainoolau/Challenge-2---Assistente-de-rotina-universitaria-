@@ -46,6 +46,8 @@ INGESTION_VERSION = "3.0.2"
 # Nunca envie mais tokens do que ele realmente processa.
 MAX_EMBEDDING_TOKENS = 128
 DEFAULT_STRUCTURAL_CHARS = 900
+MAX_HEADER_FIELD_CHARS = 80
+MAX_HEADING_LINE_CHARS = 120
 MIN_QUALITY_CHARS = 25
 
 USUARIO = "usuario_teste"
@@ -255,22 +257,41 @@ def dividir_texto(
     return results
 
 
+def _compact_header_value(value: str, max_chars: int = MAX_HEADER_FIELD_CHARS) -> str:
+    """Compacta metadado de cabeçalho para nunca exceder o orçamento do MiniLM."""
+    cleaned = " ".join(value.split()).strip()
+    if len(cleaned) <= max_chars:
+        return cleaned
+    cut = cleaned[: max_chars - 1]
+    boundary = cut.rfind(" ")
+    if boundary >= max_chars // 2:
+        cut = cut[:boundary]
+    return f"{cut.rstrip(' ,;:-')}…"
+
+
 def _context_header(source: str, page_or_time: str, text: str) -> str:
     """Compact, sanitized document locator; text is never replaced."""
+    safe_source = _compact_header_value(source, max_chars=64)
     profile = _PROFILE_START.search(text)
     if profile:
-        context = f"Perfil: {profile.group().lstrip('# ').strip()}"
+        profile_label = _compact_header_value(profile.group().lstrip("# ").strip())
+        context = f"Perfil: {profile_label}"
     else:
         heading = next(
             (
-                line.strip("# ")
+                line.strip("# ").strip()
                 for line in text.splitlines()
                 if _SECTION_START.match(line.strip())
+                and len(line.strip()) <= MAX_HEADING_LINE_CHARS
             ),
             "",
         )
-        context = f"Seção: {heading}" if heading else f"Localização: {page_or_time}"
-    return f"[Documento: {source} | {context}]"
+        if heading:
+            context = f"Seção: {_compact_header_value(heading)}"
+        else:
+            locator = _compact_header_value(page_or_time, max_chars=48)
+            context = f"Localização: {locator}"
+    return f"[Documento: {safe_source} | {context}]"
 
 
 def _token_count(text: str, tokenizer: Any) -> int:
