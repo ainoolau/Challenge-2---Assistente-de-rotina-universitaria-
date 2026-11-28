@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -28,12 +29,16 @@ def _make_simulated_orchestrator() -> MultiAgentOrchestrator:
     )
 
 
+BRT = timezone(timedelta(hours=-3))
+
+
 @pytest.fixture
 def api_client(tmp_path: Path):
     db_file = tmp_path / "vezo_test.db"
     app = create_app(
         db_path=db_file,
         orchestrator_provider=_make_simulated_orchestrator,
+        now_provider=lambda: datetime(2026, 11, 17, 5, 0, tzinfo=BRT),
     )
     with TestClient(app) as client:
         yield client, db_file
@@ -469,6 +474,7 @@ def test_chat_query_documental_abstention_planning_and_unavailable(tmp_path: Pat
     app = create_app(
         db_path=db_file,
         orchestrator_provider=_make_simulated_orchestrator,
+        now_provider=lambda: datetime(2026, 11, 17, 5, 0, tzinfo=BRT),
     )
     with TestClient(app) as client:
         _create_session(client)
@@ -745,3 +751,249 @@ def test_qdrant_local_does_not_create_directory_on_read(tmp_path):
     client = get_client(path, create_if_missing=True)
     client.close()
     assert path.is_dir()
+
+
+def test_preferences_equal_sleep_returns_422_not_500(api_client):
+    """TASK-F1-07: ValidationError em PUT /preferences deve retornar 422 JSON válido."""
+    client, _ = api_client
+    _create_session(client)
+    resp = client.put(
+        "/preferences",
+        json={"sleep_start": "22:00:00", "sleep_end": "22:00:00"},
+    )
+    assert resp.status_code == 422
+    assert isinstance(resp.json()["detail"], list)
+
+
+def test_past_horizon_clamped_and_rejected_with_now_provider(tmp_path: Path):
+    """TASK-F1-07: quarta-feira 25/11 09:45 não aloca em seg/ter e rejeita semana passada."""
+    now_wed = datetime(2026, 11, 25, 9, 45, tzinfo=BRT)
+    app = create_app(
+        db_path=tmp_path / "clock.db",
+        orchestrator_provider=_make_simulated_orchestrator,
+        now_provider=lambda: now_wed,
+    )
+    with TestClient(app) as client:
+        _create_session(client)
+        # Semana toda no passado -> 422
+        past = client.post(
+            "/schedule/optimize",
+            json={
+                "horizon": {
+                    "start": "2026-11-16T00:00:00-03:00",
+                    "end": "2026-11-23T00:00:00-03:00",
+                },
+                "study_goals": [
+                    {
+                        "goal_id": "old",
+                        "title": "Meta antiga",
+                        "duration_minutes": 60,
+                        "deadline": "2026-11-22T20:00:00-03:00",
+                        "priority": 3,
+                    }
+                ],
+            },
+        )
+        assert past.status_code == 422
+
+        # Semana atual (23/11..30/11) na quarta 09:45 -> blocos somente >= 25/11 09:45
+        opt = client.post(
+            "/schedule/optimize",
+            json={
+                "horizon": {
+                    "start": "2026-11-23T00:00:00-03:00",
+                    "end": "2026-11-30T00:00:00-03:00",
+                },
+                "study_goals": [
+                    {
+                        "goal_id": "a1",
+                        "title": "Revisão A1",
+                        "duration_minutes": 60,
+                        "deadline": "2026-11-27T21:00:00-03:00",
+                        "priority": 5,
+                    }
+                ],
+            },
+        )
+        assert opt.status_code == 200
+        blocks = opt.json()["planning"]["proposed_blocks"]
+        assert blocks
+        for blk in blocks:
+            assert datetime.fromisoformat(blk["start"]) >= now_wed
+
+        # GET /schedule oculta janelas livres anteriores a 25/11 09:45
+        sched = client.get(
+            "/schedule",
+            params={
+                "horizon_start": "2026-11-23T00:00:00-03:00",
+                "horizon_end": "2026-11-30T00:00:00-03:00",
+            },
+        )
+        assert sched.status_code == 200
+        for win in sched.json()["free_windows"]:
+            assert datetime.fromisoformat(win["start"]) >= now_wed
+
+
+def test_goals_persistence_modality_overlap_and_sqlite_migration(tmp_path: Path):
+    """TASK-F1-07/08: persistência de /goals, modalidade, allow_overlap e migração SQLite."""
+    db_file = tmp_path / "legacy.db"
+    # Cria tabela schedule_items legada (sem modality e allow_overlap) para validar migração.
+    conn = sqlite3.connect(db_file)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE sessions (
+                session_id TEXT PRIMARY KEY,
+                token_hash TEXT UNIQUE NOT NULL,
+                schedule_version INTEGER NOT NULL DEFAULT 1,
+                timezone TEXT NOT NULL DEFAULT 'America/Sao_Paulo',
+                sleep_start TEXT NOT NULL DEFAULT '22:00:00',
+                sleep_end TEXT NOT NULL DEFAULT '06:00:00',
+                buffer_minutes INTEGER NOT NULL DEFAULT 10,
+                max_block_minutes INTEGER NOT NULL DEFAULT 60,
+                min_block_minutes INTEGER NOT NULL DEFAULT 30,
+                consent_accepted INTEGER NOT NULL DEFAULT 0,
+                consent_timestamp TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE schedule_items (
+                item_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                start_iso TEXT NOT NULL,
+                end_iso TEXT NOT NULL,
+                label TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                fixed INTEGER NOT NULL DEFAULT 1,
+                goal_id TEXT,
+                buffer_before_minutes INTEGER NOT NULL DEFAULT 0,
+                buffer_after_minutes INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    app = create_app(
+        db_path=db_file,
+        orchestrator_provider=_make_simulated_orchestrator,
+        now_provider=lambda: datetime(2026, 11, 25, 6, 0, tzinfo=BRT),
+    )
+    with TestClient(app) as client:
+        _create_session(client)
+
+        # Persiste meta de estudo via /goals
+        g = client.post(
+            "/goals",
+            json={
+                "goal_id": "prova-a1",
+                "title": "Prova A1",
+                "duration_minutes": 60,
+                "deadline": "2026-11-27T21:00:00-03:00",
+                "priority": 5,
+            },
+        )
+        assert g.status_code == 201
+        assert [x["goal_id"] for x in client.get("/goals").json()] == ["prova-a1"]
+
+        # Dois itens sobrepostos com allow_overlap=True e modalidade remota -> 0 conflitos
+        r1 = client.post(
+            "/schedule",
+            json={
+                "start": "2026-11-25T08:00:00-03:00",
+                "end": "2026-11-25T12:00:00-03:00",
+                "label": "Estágio presencial",
+                "kind": "work",
+                "modality": "presencial",
+            },
+        )
+        r2 = client.post(
+            "/schedule",
+            json={
+                "start": "2026-11-25T09:00:00-03:00",
+                "end": "2026-11-25T11:00:00-03:00",
+                "label": "Atividade remota paralela",
+                "kind": "work",
+                "modality": "remoto",
+                "allow_overlap": True,
+            },
+        )
+        assert r1.status_code == 201
+        assert r2.status_code == 201
+        assert r2.json()["modality"] == "remoto"
+        assert r2.json()["allow_overlap"] is True
+
+        listed = client.get("/schedule").json()
+        assert listed["input_conflicts"] == []
+
+        assert client.delete("/goals/prova-a1").status_code == 204
+        assert client.get("/goals").json() == []
+
+
+def test_shared_groq_pacer_and_friendly_429_message(tmp_path: Path, monkeypatch):
+    """TASK-F1-09: pacing compartilhado entre requisições e mensagem amigável em HTTP 429."""
+    import urllib.error
+
+    from src.agents.llm import CallPacer, GroqLLM, LLMConfig
+    from src.api.dependencies import DefaultOrchestratorManager
+
+    pacer = CallPacer()
+    sleeps: list[float] = []
+    clock = [100.0]
+
+    monkeypatch.setattr("src.agents.llm.time.monotonic", lambda: clock[0])
+    monkeypatch.setattr(
+        "src.agents.llm.time.sleep",
+        lambda sec: (sleeps.append(sec), clock.__setitem__(0, clock[0] + sec)),
+    )
+    assert pacer.wait(5.0) == 0.0
+    clock[0] += 1.5
+    waited = pacer.wait(5.0)
+    assert waited == pytest.approx(3.5, abs=1e-6)
+    assert sleeps == [pytest.approx(3.5, abs=1e-6)]
+
+    # Verifica que DefaultOrchestratorManager injeta o mesmo pacer em instâncias distintas.
+    mgr = DefaultOrchestratorManager(pacer=pacer)
+    llm_a = GroqLLM(LLMConfig(min_call_interval=5.0))
+    llm_a.set_pacer(mgr._pacer)
+    assert llm_a._pacer is pacer
+
+    # Simula HTTP 429 na etapa multiagente -> API devolve 503 amigável e sanitizado.
+    class RateLimitedLLM(SimulatedLLM):
+        def complete(self, role, instructions, data, output):
+            raise urllib.error.HTTPError(
+                "https://api.groq.com/openai/v1/chat/completions",
+                429,
+                "Too Many Requests",
+                hdrs=None,
+                fp=None,
+            )
+
+    def _rate_limited_orchestrator() -> MultiAgentOrchestrator:
+        llm = RateLimitedLLM()
+        return MultiAgentOrchestrator(
+            ResearchAgent(SimulatedRetriever(), llm),
+            AnalysisPlanningAgent(llm),
+            ValidationAgent(llm),
+            llm,
+            mode="simulated",
+        )
+
+    app_429 = create_app(
+        db_path=tmp_path / "rate_limit.db",
+        orchestrator_provider=_rate_limited_orchestrator,
+    )
+    with TestClient(app_429) as client:
+        _create_session(client)
+        resp = client.post(
+            "/chat/query",
+            json={"question": "Qual é a frequência mínima exigida na residência?"},
+        )
+        assert resp.status_code == 503
+        detail = resp.json()["detail"].lower()
+        assert "429" in detail
+        assert "limite" in detail
+        assert "aguarde" in detail

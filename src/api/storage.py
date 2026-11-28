@@ -11,10 +11,10 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
-from src.core.schemas import ProposedBlock
+from src.core.schemas import ProposedBlock, ScheduleModality, StudyGoal
 
 from .schemas import (
     ChatHistoryMessage,
@@ -99,9 +99,9 @@ class VezoStore:
                     timezone TEXT NOT NULL DEFAULT 'America/Sao_Paulo',
                     sleep_start TEXT NOT NULL DEFAULT '22:00:00',
                     sleep_end TEXT NOT NULL DEFAULT '06:00:00',
-                    buffer_minutes INTEGER NOT NULL DEFAULT 0,
+                    buffer_minutes INTEGER NOT NULL DEFAULT 10,
                     max_block_minutes INTEGER NOT NULL DEFAULT 60,
-                    min_block_minutes INTEGER NOT NULL DEFAULT 1,
+                    min_block_minutes INTEGER NOT NULL DEFAULT 30,
                     consent_accepted INTEGER NOT NULL DEFAULT 0,
                     consent_timestamp TEXT,
                     created_at TEXT NOT NULL,
@@ -116,6 +116,8 @@ class VezoStore:
                     label TEXT NOT NULL,
                     kind TEXT NOT NULL,
                     fixed INTEGER NOT NULL DEFAULT 1,
+                    modality TEXT NOT NULL DEFAULT 'presencial',
+                    allow_overlap INTEGER NOT NULL DEFAULT 0,
                     goal_id TEXT,
                     buffer_before_minutes INTEGER NOT NULL DEFAULT 0,
                     buffer_after_minutes INTEGER NOT NULL DEFAULT 0,
@@ -125,6 +127,21 @@ class VezoStore:
 
                 CREATE INDEX IF NOT EXISTS idx_schedule_items_session
                     ON schedule_items(session_id, start_iso);
+
+                CREATE TABLE IF NOT EXISTS study_goals (
+                    session_id TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+                    goal_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    duration_minutes INTEGER NOT NULL,
+                    deadline_iso TEXT NOT NULL,
+                    priority INTEGER NOT NULL DEFAULT 3,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (session_id, goal_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_study_goals_session
+                    ON study_goals(session_id, deadline_iso);
 
                 CREATE TABLE IF NOT EXISTS proposals (
                     proposal_id TEXT PRIMARY KEY,
@@ -153,6 +170,19 @@ class VezoStore:
                     ON chat_messages(session_id, created_at);
                 """
         )
+        # Migração idempotente para bancos SQLite existentes (TASK-F1-08).
+        columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(schedule_items)").fetchall()
+        }
+        if "modality" not in columns:
+            conn.execute(
+                "ALTER TABLE schedule_items ADD COLUMN modality TEXT NOT NULL DEFAULT 'presencial'"
+            )
+        if "allow_overlap" not in columns:
+            conn.execute(
+                "ALTER TABLE schedule_items ADD COLUMN allow_overlap INTEGER NOT NULL DEFAULT 0"
+            )
 
     def ping(self) -> bool:
         with self._connect() as conn:
@@ -181,6 +211,12 @@ class VezoStore:
 
     @staticmethod
     def _row_to_item(row: sqlite3.Row) -> ScheduleItemResponse:
+        keys = row.keys()
+        raw_modality = (
+            row["modality"] if "modality" in keys and row["modality"] else "presencial"
+        )
+        modality = cast(ScheduleModality, raw_modality)
+        allow_overlap = bool(row["allow_overlap"]) if "allow_overlap" in keys else False
         return ScheduleItemResponse(
             item_id=row["item_id"],
             start=datetime.fromisoformat(row["start_iso"]),
@@ -188,6 +224,8 @@ class VezoStore:
             label=row["label"],
             kind=row["kind"],
             fixed=bool(row["fixed"]),
+            modality=modality,
+            allow_overlap=allow_overlap,
             goal_id=row["goal_id"],
             buffer_before_minutes=int(row["buffer_before_minutes"]),
             buffer_after_minutes=int(row["buffer_after_minutes"]),
@@ -341,9 +379,10 @@ class VezoStore:
                 """
                 INSERT INTO schedule_items (
                     item_id, session_id, start_iso, end_iso, label, kind,
-                    fixed, goal_id, buffer_before_minutes, buffer_after_minutes,
+                    fixed, modality, allow_overlap, goal_id,
+                    buffer_before_minutes, buffer_after_minutes,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     item_id,
@@ -353,6 +392,8 @@ class VezoStore:
                     payload.label,
                     payload.kind,
                     int(payload.fixed),
+                    payload.modality,
+                    int(payload.allow_overlap),
                     payload.goal_id,
                     payload.buffer_before_minutes,
                     payload.buffer_after_minutes,
@@ -382,7 +423,8 @@ class VezoStore:
                 """
                 UPDATE schedule_items
                 SET start_iso = ?, end_iso = ?, label = ?, kind = ?, fixed = ?,
-                    goal_id = ?, buffer_before_minutes = ?, buffer_after_minutes = ?,
+                    modality = ?, allow_overlap = ?, goal_id = ?,
+                    buffer_before_minutes = ?, buffer_after_minutes = ?,
                     updated_at = ?
                 WHERE session_id = ? AND item_id = ?
                 """,
@@ -392,6 +434,8 @@ class VezoStore:
                     updated.label,
                     updated.kind,
                     int(updated.fixed),
+                    updated.modality,
+                    int(updated.allow_overlap),
                     updated.goal_id,
                     updated.buffer_before_minutes,
                     updated.buffer_after_minutes,
@@ -425,6 +469,74 @@ class VezoStore:
                 (now, session_id),
             )
         return True
+
+    # --- METAS DE ESTUDO PERSISTENTES (TASK-F1-07 / TASK-F1-09) ---
+
+    @staticmethod
+    def _row_to_goal(row: sqlite3.Row) -> StudyGoal:
+        return StudyGoal(
+            goal_id=row["goal_id"],
+            title=row["title"],
+            duration_minutes=int(row["duration_minutes"]),
+            deadline=datetime.fromisoformat(row["deadline_iso"]),
+            priority=int(row["priority"]),
+        )
+
+    def list_study_goals(self, session_id: str) -> list[StudyGoal]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM study_goals
+                WHERE session_id = ?
+                ORDER BY deadline_iso ASC, priority DESC, goal_id ASC
+                """,
+                (session_id,),
+            ).fetchall()
+        goals = [self._row_to_goal(r) for r in rows]
+        goals.sort(key=lambda g: (g.deadline.timestamp(), -g.priority, g.goal_id))
+        return goals
+
+    def upsert_study_goal(self, session_id: str, goal: StudyGoal) -> StudyGoal:
+        now = _now_iso()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO study_goals (
+                    session_id, goal_id, title, duration_minutes,
+                    deadline_iso, priority, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(session_id, goal_id) DO UPDATE SET
+                    title = excluded.title,
+                    duration_minutes = excluded.duration_minutes,
+                    deadline_iso = excluded.deadline_iso,
+                    priority = excluded.priority,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    session_id,
+                    goal.goal_id,
+                    goal.title,
+                    goal.duration_minutes,
+                    goal.deadline.isoformat(),
+                    goal.priority,
+                    now,
+                    now,
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM study_goals WHERE session_id = ? AND goal_id = ?",
+                (session_id, goal.goal_id),
+            ).fetchone()
+        assert row is not None
+        return self._row_to_goal(row)
+
+    def delete_study_goal(self, session_id: str, goal_id: str) -> bool:
+        with self._connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM study_goals WHERE session_id = ? AND goal_id = ?",
+                (session_id, goal_id),
+            )
+        return cur.rowcount > 0
 
     # --- PROPOSTAS & CONFIRMAÇÃO TRANSACIONAL ---
 

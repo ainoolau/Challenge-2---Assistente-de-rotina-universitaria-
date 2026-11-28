@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import math
 import os
 import tempfile
 import urllib.request
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any, cast
+from zoneinfo import ZoneInfo
 
 from fastapi import (
     FastAPI,
@@ -44,6 +46,7 @@ from src.core.schemas import (
     RebalanceProposal,
     RebalanceRequest,
     ScheduleSlot,
+    StudyGoal,
 )
 
 from .dependencies import (
@@ -107,6 +110,54 @@ def _probe_qdrant_health(timeout: float = 2.0) -> tuple[bool, bool]:
     return False, False
 
 
+def _validation_error_detail(exc: ValidationError) -> list[dict[str, Any]]:
+    """Serializa erros Pydantic de forma segura para JSON (evita HTTP 500 em 422)."""
+    return [dict(err) for err in exc.errors(include_input=False, include_context=False)]
+
+
+def _ceil_to_minutes(dt: datetime, step_minutes: int = 15) -> datetime:
+    """Arredonda `dt` para cima até o próximo múltiplo de `step_minutes`."""
+    step_sec = step_minutes * 60
+    ceiled = math.ceil(dt.timestamp() / step_sec) * step_sec
+    return datetime.fromtimestamp(ceiled, UTC).astimezone(dt.tzinfo or UTC)
+
+
+def _clamp_horizon_not_before(
+    horizon: Interval, now: datetime, timezone_name: str
+) -> Interval:
+    """Impede alocação no passado aplicando corte inferior no próximo slot de 15 min."""
+    zone = ZoneInfo(timezone_name)
+    not_before = _ceil_to_minutes(now.astimezone(zone), 15)
+    if horizon.end.timestamp() <= not_before.timestamp():
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "O período selecionado já passou. Escolha a semana atual ou uma data futura."
+            ),
+        )
+    if horizon.start.timestamp() < not_before.timestamp():
+        return Interval(start=not_before, end=horizon.end)
+    return horizon
+
+
+def _trim_past_free_windows(
+    windows: list[Interval], now: datetime, timezone_name: str
+) -> list[Interval]:
+    """Remove janelas livres já encerradas e recorta o início da janela atual para `now`."""
+    zone = ZoneInfo(timezone_name)
+    now_zoned = now.astimezone(zone)
+    now_ts = now_zoned.timestamp()
+    trimmed: list[Interval] = []
+    for win in windows:
+        if win.end.timestamp() <= now_ts:
+            continue
+        if win.start.timestamp() < now_ts:
+            trimmed.append(Interval(start=now_zoned, end=win.end))
+        else:
+            trimmed.append(win)
+    return trimmed
+
+
 def _overlaps_protected_sleep(interval: Interval, prefs: SessionPreferences) -> bool:
     sleep_slots = expand_sleep_slots(
         horizon=interval,
@@ -131,6 +182,8 @@ def _items_to_fixed_slots(items: list[ScheduleItemResponse]) -> list[ScheduleSlo
                 label=item.label,
                 kind=cast(Any, slot_kind),
                 fixed=True,
+                modality=item.modality,
+                allow_overlap=item.allow_overlap,
                 buffer_before_minutes=item.buffer_before_minutes,
                 buffer_after_minutes=item.buffer_after_minutes,
             )
@@ -151,6 +204,8 @@ def _items_to_all_busy_slots(items: list[ScheduleItemResponse]) -> list[Schedule
                 label=item.label,
                 kind=cast(Any, slot_kind),
                 fixed=item.fixed,
+                modality=item.modality,
+                allow_overlap=item.allow_overlap,
                 buffer_before_minutes=item.buffer_before_minutes,
                 buffer_after_minutes=item.buffer_after_minutes,
             )
@@ -184,6 +239,7 @@ def create_app(
     db_path: str | Path | None = None,
     orchestrator_provider: OrchestratorProvider | None = None,
     cors_origins: list[str] | None = None,
+    now_provider: Callable[[], datetime] | None = None,
 ) -> FastAPI:
     """Cria instância configurável da aplicação FastAPI do Vezo."""
     resolved_db: str | Path = (
@@ -192,6 +248,7 @@ def create_app(
     store = VezoStore(resolved_db)
     default_manager = DefaultOrchestratorManager()
     provider = orchestrator_provider or default_manager.get
+    clock: Callable[[], datetime] = now_provider or (lambda: datetime.now(UTC))
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -301,7 +358,7 @@ def create_app(
         except ValidationError as exc:
             raise HTTPException(
                 status_code=422,
-                detail=exc.errors(),
+                detail=_validation_error_detail(exc),
             ) from exc
 
         updated = store_dep.update_preferences(
@@ -348,7 +405,9 @@ def create_app(
                     status_code=422,
                     detail=exc.errors(),
                 ) from exc
-            windows = free_windows(plan_req)
+            windows = _trim_past_free_windows(
+                free_windows(plan_req), clock(), session.preferences.timezone
+            )
 
         return ScheduleListResponse(
             schedule_version=session.schedule_version,
@@ -427,6 +486,14 @@ def create_app(
             "label": payload.label if payload.label is not None else existing.label,
             "kind": payload.kind if payload.kind is not None else existing.kind,
             "fixed": payload.fixed if payload.fixed is not None else existing.fixed,
+            "modality": (
+                payload.modality if payload.modality is not None else existing.modality
+            ),
+            "allow_overlap": (
+                payload.allow_overlap
+                if payload.allow_overlap is not None
+                else existing.allow_overlap
+            ),
             "goal_id": (
                 payload.goal_id if payload.goal_id is not None else existing.goal_id
             ),
@@ -446,7 +513,7 @@ def create_app(
         except ValidationError as exc:
             raise HTTPException(
                 status_code=422,
-                detail=exc.errors(),
+                detail=_validation_error_detail(exc),
             ) from exc
 
         if validated.kind == "sleep" or _overlaps_protected_sleep(
@@ -495,6 +562,45 @@ def create_app(
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     # =========================================================================
+    # 2B. METAS DE ESTUDO PERSISTENTES (TASK-F1-07 / TASK-F1-09)
+    # =========================================================================
+
+    @app.get("/goals", response_model=list[StudyGoal], tags=["goals"])
+    def list_goals(session: SessionDep, store_dep: StoreDep) -> list[StudyGoal]:
+        return store_dep.list_study_goals(session.session_id)
+
+    @app.post(
+        "/goals",
+        response_model=StudyGoal,
+        status_code=status.HTTP_201_CREATED,
+        tags=["goals"],
+    )
+    def upsert_goal(
+        payload: StudyGoal,
+        session: SessionDep,
+        store_dep: StoreDep,
+    ) -> StudyGoal:
+        return store_dep.upsert_study_goal(session.session_id, payload)
+
+    @app.delete(
+        "/goals/{goal_id}",
+        status_code=status.HTTP_204_NO_CONTENT,
+        tags=["goals"],
+    )
+    def delete_goal(
+        goal_id: str,
+        session: SessionDep,
+        store_dep: StoreDep,
+    ) -> Response:
+        deleted = store_dep.delete_study_goal(session.session_id, goal_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Meta de estudo não encontrada nesta sessão.",
+            )
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    # =========================================================================
     # 3. OTIMIZAÇÃO, REALOCAÇÃO & CONFIRMAÇÃO TRANSACIONAL (TASK-F4-05 #69)
     # =========================================================================
 
@@ -510,10 +616,13 @@ def create_app(
     ) -> ScheduleProposalResponse:
         items = store_dep.list_schedule_items(session.session_id)
         prefs = session.preferences
+        effective_horizon = _clamp_horizon_not_before(
+            payload.horizon, clock(), prefs.timezone
+        )
         try:
             plan_req = PlanningRequest(
                 timezone=prefs.timezone,
-                horizon=payload.horizon,
+                horizon=effective_horizon,
                 schedule_slots=_items_to_all_busy_slots(items),
                 study_goals=payload.study_goals,
                 sleep_start=prefs.sleep_start,
@@ -537,7 +646,7 @@ def create_app(
         except ValidationError as exc:
             raise HTTPException(
                 status_code=422,
-                detail=exc.errors(),
+                detail=_validation_error_detail(exc),
             ) from exc
 
         proposal = plan(plan_req)
@@ -581,17 +690,25 @@ def create_app(
     ) -> ScheduleProposalResponse:
         items = store_dep.list_schedule_items(session.session_id)
         prefs = session.preferences
+        effective_horizon = _clamp_horizon_not_before(
+            payload.horizon, clock(), prefs.timezone
+        )
         fixed_slots = _items_to_fixed_slots(items)
-        existing_blocks = _items_to_flexible_blocks(items, payload.horizon)
+        existing_blocks = _items_to_flexible_blocks(items, effective_horizon)
+        effective_goals = (
+            payload.study_goals
+            if payload.study_goals
+            else store_dep.list_study_goals(session.session_id)
+        )
 
         try:
             reb_req = RebalanceRequest(
                 timezone=prefs.timezone,
-                horizon=payload.horizon,
+                horizon=effective_horizon,
                 schedule_slots=fixed_slots,
                 disruptions=payload.disruptions,
                 existing_blocks=existing_blocks,
-                study_goals=payload.study_goals,
+                study_goals=effective_goals,
                 sleep_start=prefs.sleep_start,
                 sleep_end=prefs.sleep_end,
                 buffer_minutes=(
@@ -614,7 +731,7 @@ def create_app(
         except ValidationError as exc:
             raise HTTPException(
                 status_code=422,
-                detail=exc.errors(),
+                detail=_validation_error_detail(exc),
             ) from exc
 
         proposal = rebalance(reb_req)
@@ -908,7 +1025,7 @@ def create_app(
         except ValidationError as exc:
             raise HTTPException(
                 status_code=422,
-                detail=exc.errors(),
+                detail=_validation_error_detail(exc),
             ) from exc
 
         orch_provider: OrchestratorProvider = request.app.state.orchestrator_provider
@@ -941,13 +1058,21 @@ def create_app(
             ) from exc
 
         if result.status == "error":
+            raw_msg = result.error.get("message") if result.error else None
+            if raw_msg and "HTTP 429" in raw_msg:
+                detail_msg = (
+                    "O assistente atingiu temporariamente o limite de consultas do "
+                    "provedor de IA (HTTP 429). Aguarde alguns segundos e tente "
+                    "novamente; nenhuma resposta foi inventada e nenhuma agenda foi alterada."
+                )
+            else:
+                detail_msg = (
+                    raw_msg
+                    or "Falha temporária no fluxo multiagente; nenhuma agenda foi alterada."
+                )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=(
-                    result.error.get("message")
-                    if result.error
-                    else "Falha temporária no fluxo multiagente; nenhuma agenda foi alterada."
-                ),
+                detail=detail_msg,
             )
 
         citations: list[CitationItem] = []

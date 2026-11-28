@@ -20,12 +20,15 @@ import { ApiError, api, isApiError } from "@/lib/api";
 import type {
   ScheduleItemKind,
   ScheduleItemResponse,
+  ScheduleModality,
   SessionPreferences,
 } from "@/types/api";
 
 import {
   EDITABLE_KINDS,
   KIND_LABELS,
+  MODALITY_LABELS,
+  MODALITY_OPTIONS,
   buildZonedIso,
   classifyConflictError,
   isoToDateKey,
@@ -111,6 +114,10 @@ function ScheduleItemDialogBody({
       : initialDraft.endTime,
   );
   const [fixed, setFixed] = useState(editingItem ? editingItem.fixed : (initialDraft.fixed ?? true));
+  const [modality, setModality] = useState<ScheduleModality>(
+    editingItem?.modality ?? "presencial",
+  );
+  const [allowOverlap, setAllowOverlap] = useState(editingItem?.allow_overlap ?? false);
   const [bufferBefore, setBufferBefore] = useState(
     editingItem ? String(editingItem.buffer_before_minutes) : "0",
   );
@@ -133,10 +140,10 @@ function ScheduleItemDialogBody({
     const before = Number(bufferBefore);
     const after = Number(bufferAfter);
     if (Number.isNaN(before) || before < 0 || before > 180) {
-      return "Buffer anterior deve estar entre 0 e 180 minutos.";
+      return "O tempo livre antes deve estar entre 0 e 180 minutos.";
     }
     if (Number.isNaN(after) || after < 0 || after > 180) {
-      return "Buffer posterior deve estar entre 0 e 180 minutos.";
+      return "O tempo livre depois deve estar entre 0 e 180 minutos.";
     }
     return null;
   }
@@ -158,6 +165,8 @@ function ScheduleItemDialogBody({
       start: buildZonedIso(dateKey, startTime, preferences.timezone),
       end: buildZonedIso(dateKey, endTime, preferences.timezone),
       fixed,
+      modality,
+      allow_overlap: allowOverlap,
       buffer_before_minutes: Number(bufferBefore) || 0,
       buffer_after_minutes: Number(bufferAfter) || 0,
     };
@@ -231,8 +240,7 @@ function ScheduleItemDialogBody({
             {editingItem ? "Editar compromisso" : "Novo compromisso"}
           </DialogTitle>
           <DialogDescription>
-            Fuso da sessão: <span className="font-mono">{preferences.timezone}</span> · Sono
-            protegido: <span className="font-mono">{sleepStart}–{sleepEnd}</span>.
+            Seu horário de descanso ({sleepStart}–{sleepEnd}) permanece sempre protegido.
           </DialogDescription>
         </DialogHeader>
 
@@ -315,7 +323,38 @@ function ScheduleItemDialogBody({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex min-w-0 flex-col gap-1.5">
-              <Label htmlFor={`${formId}-buf-before`}>Buffer antes (min)</Label>
+              <Label htmlFor={`${formId}-modality`}>Modalidade</Label>
+              <select
+                id={`${formId}-modality`}
+                value={modality}
+                onChange={(e) => {
+                  const next = e.target.value as ScheduleModality;
+                  setModality(next);
+                  if (next === "remoto") {
+                    setBufferBefore("0");
+                    setBufferAfter("0");
+                  }
+                }}
+                className="h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                {MODALITY_OPTIONS.map((m) => (
+                  <option key={m} value={m}>
+                    {MODALITY_LABELS[m]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex min-w-0 flex-col justify-end text-xs text-muted-foreground">
+              {modality === "remoto"
+                ? "Compromissos remotos não adicionam tempo de deslocamento automático."
+                : "Presencial e híbrido respeitam seu intervalo padrão entre atividades."}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label htmlFor={`${formId}-buf-before`}>Tempo livre antes (min)</Label>
               <Input
                 id={`${formId}-buf-before`}
                 type="number"
@@ -326,7 +365,7 @@ function ScheduleItemDialogBody({
               />
             </div>
             <div className="flex min-w-0 flex-col gap-1.5">
-              <Label htmlFor={`${formId}-buf-after`}>Buffer depois (min)</Label>
+              <Label htmlFor={`${formId}-buf-after`}>Tempo livre depois (min)</Label>
               <Input
                 id={`${formId}-buf-after`}
                 type="number"
@@ -352,6 +391,23 @@ function ScheduleItemDialogBody({
             <span>
               <strong>Compromisso fixo</strong> — o Vezo nunca move este horário ao otimizar ou
               rebalancear sua semana.
+            </span>
+          </label>
+
+          <label
+            htmlFor={`${formId}-overlap`}
+            className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm has-[:checked]:border-primary has-[:checked]:bg-accent"
+          >
+            <input
+              id={`${formId}-overlap`}
+              type="checkbox"
+              checked={allowOverlap}
+              onChange={(e) => setAllowOverlap(e.target.checked)}
+              className="mt-0.5 size-5 shrink-0 accent-primary"
+            />
+            <span>
+              <strong>Pode ocorrer em paralelo</strong> — permite coexistir com outro compromisso no
+              mesmo horário sem marcar conflito.
             </span>
           </label>
 
@@ -426,7 +482,7 @@ function ScheduleItemDialogBody({
               <AlertTriangle aria-hidden />
               <AlertTitle>
                 {apiError.kind === "validation"
-                  ? "Erro de validação (422)"
+                  ? "Revise os campos"
                   : "Não foi possível concluir"}
               </AlertTitle>
               <AlertDescription>{apiError.message}</AlertDescription>

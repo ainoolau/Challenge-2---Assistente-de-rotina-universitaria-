@@ -12,6 +12,7 @@ from src.agents import planning as agents_planning
 from src.core.planning import (
     audit_plan,
     audit_rebalance,
+    detect_input_conflicts,
     free_windows,
     plan,
     protected_slots,
@@ -598,3 +599,206 @@ def test_invalid_planning_request_parameters_rejected(kwargs):
             horizon=Interval(start=_dt(17, 6), end=_dt(17, 22)),
             **kwargs,
         )
+
+
+def test_multijornada_stress_40h_overload_zero_violations():
+    """Teste de estresse multijornada (TASK-F1-07): 40h de metas sobre semana pesada."""
+    horizon = Interval(start=_dt(23, 6), end=_dt(29, 22))
+    slots: list[ScheduleSlot] = []
+    # Trabalho fixo Seg-Sex 09:00-18:00 + buffer 30m
+    for day in range(23, 28):
+        slots.append(
+            ScheduleSlot(
+                slot_id=f"work-{day}",
+                start=_dt(day, 9),
+                end=_dt(day, 18),
+                label="Trabalho fixo",
+                kind="work",
+                buffer_before_minutes=30,
+                buffer_after_minutes=30,
+            )
+        )
+    # Faculdade fixa Seg/Qua/Sex 19:00-21:30 + buffer 15m
+    for day in (23, 25, 27):
+        slots.append(
+            ScheduleSlot(
+                slot_id=f"class-{day}",
+                start=_dt(day, 19),
+                end=_dt(day, 21, 30),
+                label="Faculdade noturna",
+                kind="class",
+                buffer_before_minutes=15,
+                buffer_after_minutes=15,
+            )
+        )
+
+    goals = [
+        StudyGoal(
+            goal_id="p5-prova",
+            title="Prova crítica",
+            duration_minutes=1200,
+            deadline=_dt(26, 21),
+            priority=5,
+        ),
+        StudyGoal(
+            goal_id="p4-entrega",
+            title="Entrega de projeto",
+            duration_minutes=1200,
+            deadline=_dt(28, 20),
+            priority=4,
+        ),
+        StudyGoal(
+            goal_id="p2-leitura",
+            title="Leituras extras",
+            duration_minutes=1800,
+            deadline=_dt(29, 22),
+            priority=2,
+        ),
+    ]
+    req = PlanningRequest(
+        horizon=horizon,
+        schedule_slots=slots,
+        study_goals=goals,
+        buffer_minutes=10,
+        min_block_minutes=30,
+        max_block_minutes=60,
+    )
+    proposal = plan(req)
+    assert proposal is not None
+    assert proposal.requires_confirmation is True
+    assert audit_plan(req, proposal) == []
+    assert any(u.remaining_minutes > 0 for u in proposal.unallocated)
+
+
+def test_rebalance_priority_preemption_displaces_low_priority_for_critical_goal():
+    """Preempção controlada (TASK-F1-07): P5 atingido por imprevisto desloca P1 com folga."""
+    horizon = Interval(start=_dt(25, 6), end=_dt(29, 22))
+    # Quarta (25) e Quinta (26) lotadas exceto 19h-21h de quarta e 19h-21h de quinta.
+    fixed_slots = [
+        ScheduleSlot(
+            start=_dt(25, 6), end=_dt(25, 19), label="Jornada Qua", kind="work"
+        ),
+        ScheduleSlot(
+            start=_dt(25, 21), end=_dt(25, 22), label="Compromisso Qua", kind="other"
+        ),
+        ScheduleSlot(
+            start=_dt(26, 6), end=_dt(26, 19), label="Jornada Qui", kind="work"
+        ),
+        ScheduleSlot(
+            start=_dt(26, 21), end=_dt(26, 22), label="Compromisso Qui", kind="other"
+        ),
+    ]
+    goals = [
+        StudyGoal(
+            goal_id="critica",
+            title="Prova A1",
+            duration_minutes=60,
+            deadline=_dt(26, 21),
+            priority=5,
+        ),
+        StudyGoal(
+            goal_id="baixa",
+            title="Leitura opcional",
+            duration_minutes=60,
+            deadline=_dt(29, 21),
+            priority=1,
+        ),
+    ]
+    existing = [
+        ProposedBlock(
+            goal_id="critica",
+            title="Prova A1",
+            start=_dt(25, 19),
+            end=_dt(25, 20),
+        ),
+        ProposedBlock(
+            goal_id="baixa",
+            title="Leitura opcional",
+            start=_dt(26, 19),
+            end=_dt(26, 20),
+        ),
+    ]
+    # Imprevisto ocupa toda a janela de quarta 19h-21h; na quinta 19h-20h há apenas 1h (ocupada por P1).
+    disruptions = [
+        ScheduleSlot(
+            start=_dt(25, 19),
+            end=_dt(25, 21),
+            label="Reunião urgente",
+            kind="work",
+        ),
+        ScheduleSlot(
+            start=_dt(26, 20),
+            end=_dt(26, 21),
+            label="Plantão extra",
+            kind="work",
+        ),
+    ]
+    req = RebalanceRequest(
+        horizon=horizon,
+        schedule_slots=fixed_slots,
+        disruptions=disruptions,
+        existing_blocks=existing,
+        study_goals=goals,
+        buffer_minutes=0,
+        min_block_minutes=30,
+    )
+    proposal = rebalance(req)
+    assert audit_rebalance(req, proposal) == []
+    # P5 foi realocado para Quinta 19h-20h e P1 foi movido para Sexta/fim de semana!
+    assert proposal.unallocated == []
+    p5_blocks = [b for b in proposal.proposed_blocks if b.goal_id == "critica"]
+    p1_blocks = [b for b in proposal.proposed_blocks if b.goal_id == "baixa"]
+    assert len(p5_blocks) == 1
+    assert p5_blocks[0].start == _dt(26, 19)
+    assert len(p1_blocks) == 1
+    assert p1_blocks[0].start >= _dt(27, 6)
+    assert any(m.goal_id == "baixa" for m in proposal.diff.moved)
+
+
+def test_modality_remote_skips_global_buffer_and_allow_overlap_suppresses_conflict():
+    """TASK-F1-08: remoto não herda buffer global e allow_overlap coexiste sem conflito."""
+    presencial = ScheduleSlot(
+        slot_id="res",
+        start=_dt(17, 8),
+        end=_dt(17, 12),
+        label="Atividade presencial",
+        kind="work",
+        modality="presencial",
+    )
+    remoto_paralelo = ScheduleSlot(
+        slot_id="trad",
+        start=_dt(17, 10),
+        end=_dt(17, 11),
+        label="Tradução remota",
+        kind="work",
+        modality="remoto",
+        allow_overlap=True,
+    )
+    remoto_solo = ScheduleSlot(
+        slot_id="ead",
+        start=_dt(17, 14),
+        end=_dt(17, 16),
+        label="Aula EAD",
+        kind="class",
+        modality="remoto",
+    )
+
+    assert detect_input_conflicts([presencial, remoto_paralelo, remoto_solo]) == []
+
+    # Sem allow_overlap, o mesmo par dispara conflito normalmente.
+    conflito = remoto_paralelo.model_copy(update={"allow_overlap": False})
+    assert len(detect_input_conflicts([presencial, conflito])) == 1
+
+    # Buffer global de 20 min afeta presencial (08:00-12:00 -> 07:40-12:20),
+    # mas NÃO afeta remoto (14:00-16:00 permanece livre até 14:00 e retoma às 16:00).
+    req = PlanningRequest(
+        horizon=Interval(start=_dt(17, 6), end=_dt(17, 22)),
+        buffer_minutes=20,
+        schedule_slots=[presencial, remoto_paralelo, remoto_solo],
+    )
+    windows = free_windows(req)
+    assert [(w.start, w.end) for w in windows] == [
+        (_dt(17, 6, 0), _dt(17, 7, 40)),
+        (_dt(17, 12, 20), _dt(17, 14, 0)),
+        (_dt(17, 16, 0), _dt(17, 22, 0)),
+    ]

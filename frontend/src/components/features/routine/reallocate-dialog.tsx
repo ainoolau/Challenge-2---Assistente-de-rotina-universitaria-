@@ -142,8 +142,8 @@ function ReallocateDialogBody({
             Simular imprevisto e rebalancear
           </DialogTitle>
           <DialogDescription>
-            O motor determinístico preserva sono protegido, compromissos fixos e blocos flexíveis
-            não afetados, devolvendo um diff antes de qualquer alteração.
+            O Vezo preserva seu sono, seus compromissos fixos e os estudos não afetados, mostrando
+            uma prévia das mudanças antes de salvar.
           </DialogDescription>
         </DialogHeader>
 
@@ -248,7 +248,7 @@ function ReallocateDialogBody({
             disabled={submitting}
             className="h-auto min-h-11 w-full whitespace-normal py-2 text-center sm:w-auto"
           >
-            {submitting ? "Calculando diff…" : "Gerar proposta de rebalanceamento"}
+            {submitting ? "Calculando nova proposta…" : "Gerar proposta de rebalanceamento"}
           </Button>
         </DialogFooter>
       </DialogContent>

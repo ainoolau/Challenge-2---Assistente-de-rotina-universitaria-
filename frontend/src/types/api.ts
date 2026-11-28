@@ -25,12 +25,15 @@ export interface Interval {
 }
 
 export type ScheduleSlotKind = "sleep" | "work" | "class" | "commute" | "other";
+export type ScheduleModality = "presencial" | "remoto" | "hibrido";
 
 export interface ScheduleSlot extends Interval {
   slot_id?: string | null;
   label: string;
   kind?: ScheduleSlotKind;
   fixed?: boolean;
+  modality?: ScheduleModality;
+  allow_overlap?: boolean;
   buffer_before_minutes?: number;
   buffer_after_minutes?: number;
 }
@@ -152,6 +155,8 @@ export interface ScheduleItemCreate extends Interval {
   label: string;
   kind?: ScheduleItemKind;
   fixed?: boolean;
+  modality?: ScheduleModality;
+  allow_overlap?: boolean;
   goal_id?: string | null;
   buffer_before_minutes?: number;
   buffer_after_minutes?: number;
@@ -163,6 +168,8 @@ export interface ScheduleItemUpdate {
   label?: string | null;
   kind?: ScheduleItemKind | null;
   fixed?: boolean | null;
+  modality?: ScheduleModality | null;
+  allow_overlap?: boolean | null;
   goal_id?: string | null;
   buffer_before_minutes?: number | null;
   buffer_after_minutes?: number | null;
@@ -173,6 +180,8 @@ export interface ScheduleItemResponse extends Interval {
   label: string;
   kind: ScheduleItemKind;
   fixed: boolean;
+  modality: ScheduleModality;
+  allow_overlap: boolean;
   goal_id: string | null;
   buffer_before_minutes: number;
   buffer_after_minutes: number;
