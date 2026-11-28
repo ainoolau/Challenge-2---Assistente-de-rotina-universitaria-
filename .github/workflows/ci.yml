@@ -147,14 +147,14 @@ jobs:
               ;;
             rag-mlops-readiness)
               pip install pytest qdrant-client "pydantic>=2.6.0"
-              pytest tests/test_retrieval.py -v
+              pytest tests/test_retrieval.py tests/test_chunking_structural.py -v
               MLOPS_NOTE="Pendente (auto-ativa assim que tests/test_mlops.py for criado)"
               if [ -f "tests/test_mlops.py" ]; then
                 pytest tests/test_mlops.py -v
                 MLOPS_NOTE="Ativo e validado (tests/test_mlops.py)"
               fi
               echo "### MLOps — RAG & Observability Readiness" >> "$GITHUB_STEP_SUMMARY"
-              echo "- Retrieval em memória (\`tests/test_retrieval.py\`): **PASS**" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Retrieval e chunking estrutural (\`tests/test_retrieval.py\`, \`tests/test_chunking_structural.py\`): **PASS**" >> "$GITHUB_STEP_SUMMARY"
               echo "- Observabilidade MLflow (\`src/mlops/\`): $MLOPS_NOTE" >> "$GITHUB_STEP_SUMMARY"
               ;;
           esac

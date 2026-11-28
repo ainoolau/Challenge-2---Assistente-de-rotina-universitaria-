@@ -31,6 +31,7 @@ LIGHT_TEST_SUITE = [
     "tests/test_smoke.py",
     "tests/test_benchmark_golden_set.py",
     "tests/test_zero_shot.py",
+    "tests/test_chunking_structural.py",
     "tests/test_planning_core.py",
     "tests/test_multiagents.py",
     "tests/test_api.py",

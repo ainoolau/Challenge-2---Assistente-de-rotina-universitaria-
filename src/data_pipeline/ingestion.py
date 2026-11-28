@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -40,7 +41,13 @@ NOME_COLECAO = "rotina_estudante_multimodal"
 # MODELO MULTILÍNGUE (Suporte nativo a Português, 384 dimensões)
 MODELO_NOME = "paraphrase-multilingual-MiniLM-L12-v2"
 VECTOR_SIZE = 384
-INGESTION_VERSION = "2.0.0"
+INGESTION_VERSION = "3.0.2"
+# O SentenceTransformer instalado usa max_seq_length=128.
+# Nunca envie mais tokens do que ele realmente processa.
+MAX_EMBEDDING_TOKENS = 128
+DEFAULT_STRUCTURAL_CHARS = 900
+MAX_HEADER_FIELD_CHARS = 80
+MAX_HEADING_LINE_CHARS = 120
 MIN_QUALITY_CHARS = 25
 
 USUARIO = "usuario_teste"
@@ -127,29 +134,211 @@ def normalize_source_key(arquivo: Path) -> str:
 # 2 - DIVIDIR O TEXTO EM BLOCOS
 
 
-def dividir_texto(texto: str, tamanho: int = 500, sobreposicao: int = 50) -> list[str]:
-    """Divide o texto em blocos de até 500 caracteres."""
+# The same boundaries are used for the payload and the embedding input. Thus,
+# a ResearchAgent quote remains a literal substring of payload["text"].
+_PROFILE_START = re.compile(r"(?m)^\s*##\s*Perfil\s+Estudante\b[^\n]*", re.IGNORECASE)
+_SECTION_START = re.compile(
+    r"(?i)^(?:#{1,6}\s+.+|(?:cap[ií]tulo|se[çc][ãa]o|art\.?|cl[áa]usula)\s+"
+    r"[\dIVXLCDM]+\b.*|\d+(?:\.\d+)*[.)]\s+.+)$"
+)
+
+
+def _profile_sections(text: str) -> list[tuple[str, str]]:
+    """Isolate profiles before any packing or overlap is applied."""
+    matches = list(_PROFILE_START.finditer(text))
+    if not matches:
+        return [("", text)]
+    parts: list[tuple[str, str]] = []
+    if text[: matches[0].start()].strip():
+        parts.append(("", text[: matches[0].start()].strip()))
+    for i, match in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        section = text[match.start() : end].strip()
+        # A dashed divider belongs to neither profile; keep it out of embeddings.
+        section = re.sub(r"(?m)^\s*---+\s*$", "", section).strip()
+        parts.append((match.group().strip(), section))
+    return parts
+
+
+def _structural_units(text: str) -> list[str]:
+    """Prefer whole paragraphs and table/calendar rows over character slicing."""
+    units: list[str] = []
+    paragraph: list[str] = []
+
+    def flush() -> None:
+        if paragraph:
+            units.append("\n".join(paragraph).strip())
+            paragraph.clear()
+
+    for original in text.splitlines():
+        line = original.strip()
+        if not line:
+            flush()
+            continue
+        # Markdown tables, tabular fields, schedule lines and list entries
+        # are kept together with the date/time or value on their own line.
+        row = (
+            line.startswith("|")
+            or "\t" in line
+            or bool(re.match(r"^(?:[-*+]\s+|\d+[.)]\s+)", line))
+            or bool(re.search(r"\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b", line))
+        )
+        if _SECTION_START.match(line) or row:
+            flush()
+            units.append(line)
+        else:
+            paragraph.append(line)
+    flush()
+    return [unit for unit in units if unit]
+
+
+def _split_oversized(text: str, limit: int, overlap: int) -> list[str]:
+    """Last-resort windowing with word/line boundaries when possible."""
+    pieces: list[str] = []
+    remaining = text.strip()
+    while len(remaining) > limit:
+        end = limit
+        boundary = max(remaining.rfind("\n", 0, end), remaining.rfind(" ", 0, end))
+        if boundary >= limit // 2:
+            end = boundary
+        part = remaining[:end].strip()
+        if not part:
+            end = limit
+            part = remaining[:end].strip()
+        pieces.append(part)
+        advance = max(1, end - overlap)
+        remaining = remaining[advance:].strip()
+    if remaining:
+        pieces.append(remaining)
+    return pieces
+
+
+def dividir_texto(
+    texto: str, tamanho: int = DEFAULT_STRUCTURAL_CHARS, sobreposicao: int = 160
+) -> list[str]:
+    """Chunk by profiles, clauses, paragraphs and full schedule/table rows.
+
+    Overlap is restricted to oversized units; it cannot cross a student boundary.
+    """
     if tamanho <= 0:
         raise ValueError("O tamanho deve ser positivo.")
-
     if sobreposicao < 0 or sobreposicao >= tamanho:
         raise ValueError("Sobreposição inválida.")
-
     if not texto.strip():
         return []
 
-    blocos = []
-    passo = tamanho - sobreposicao
+    results: list[str] = []
+    for profile, section in _profile_sections(texto):
+        section_results: list[str] = []
+        buffer: list[str] = []
+        for unit in _structural_units(section):
+            if len(unit) > tamanho:
+                if buffer:
+                    section_results.append("\n\n".join(buffer))
+                    buffer = []
+                section_results.extend(_split_oversized(unit, tamanho, sobreposicao))
+                continue
+            candidate = "\n\n".join([*buffer, unit])
+            if buffer and len(candidate) > tamanho:
+                section_results.append("\n\n".join(buffer))
+                buffer = [unit]
+            else:
+                buffer.append(unit)
+        if buffer:
+            section_results.append("\n\n".join(buffer))
+        # Repeat the profile identifier in each split unit, even if the
+        # profile spans many chunks; never include text from another profile.
+        for chunk in section_results:
+            if profile and not chunk.lstrip().startswith(profile):
+                prefix = f"{profile}\n"
+                if len(prefix) < tamanho:
+                    chunk = prefix + chunk
+            results.append(chunk)
+    return results
 
-    for inicio in range(0, len(texto), passo):
-        fim = inicio + tamanho
-        bloco = texto[inicio:fim]
-        blocos.append(bloco)
 
-        if fim >= len(texto):
-            break
+def _compact_header_value(value: str, max_chars: int = MAX_HEADER_FIELD_CHARS) -> str:
+    """Compacta metadado de cabeçalho para nunca exceder o orçamento do MiniLM."""
+    cleaned = " ".join(value.split()).strip()
+    if len(cleaned) <= max_chars:
+        return cleaned
+    cut = cleaned[: max_chars - 1]
+    boundary = cut.rfind(" ")
+    if boundary >= max_chars // 2:
+        cut = cut[:boundary]
+    return f"{cut.rstrip(' ,;:-')}…"
 
-    return blocos
+
+def _context_header(source: str, page_or_time: str, text: str) -> str:
+    """Compact, sanitized document locator; text is never replaced."""
+    safe_source = _compact_header_value(source, max_chars=64)
+    profile = _PROFILE_START.search(text)
+    if profile:
+        profile_label = _compact_header_value(profile.group().lstrip("# ").strip())
+        context = f"Perfil: {profile_label}"
+    else:
+        heading = next(
+            (
+                line.strip("# ").strip()
+                for line in text.splitlines()
+                if _SECTION_START.match(line.strip())
+                and len(line.strip()) <= MAX_HEADING_LINE_CHARS
+            ),
+            "",
+        )
+        if heading:
+            context = f"Seção: {_compact_header_value(heading)}"
+        else:
+            locator = _compact_header_value(page_or_time, max_chars=48)
+            context = f"Localização: {locator}"
+    return f"[Documento: {safe_source} | {context}]"
+
+
+def _token_count(text: str, tokenizer: Any) -> int:
+    return len(tokenizer.encode(text, add_special_tokens=True))
+
+
+def _fit_token_budget(
+    text: str, header: str, tokenizer: Any, max_tokens: int = MAX_EMBEDDING_TOKENS
+) -> list[str]:
+    """Split on word boundaries until the *real tokenizer* fits the full input."""
+    if _token_count(f"{header}\n{text}", tokenizer) <= max_tokens:
+        return [text]
+    units = re.findall(r"\S+\s*", text)
+    output: list[str] = []
+    current = ""
+    for unit in units:
+        candidate = current + unit
+        if _token_count(f"{header}\n{candidate}", tokenizer) <= max_tokens:
+            current = candidate
+            continue
+        if current.strip():
+            output.append(current.strip())
+            current = ""
+        if _token_count(f"{header}\n{unit}", tokenizer) <= max_tokens:
+            current = unit
+            continue
+        # Exceptionally long, unbreakable word (e.g., OCR noise): use
+        # a conservative character-level fallback, checked by tokenizer.
+        remainder = unit
+        while remainder:
+            lo, hi = 1, len(remainder)
+            while lo < hi:
+                mid = (lo + hi + 1) // 2
+                if (
+                    _token_count(f"{header}\n{remainder[:mid]}", tokenizer)
+                    <= max_tokens
+                ):
+                    lo = mid
+                else:
+                    hi = mid - 1
+            if _token_count(f"{header}\n{remainder[:lo]}", tokenizer) > max_tokens:
+                raise ValueError("Cabeçalho contextual excede o limite do MiniLM.")
+            output.append(remainder[:lo].strip())
+            remainder = remainder[lo:]
+    if current.strip():
+        output.append(current.strip())
+    return [part for part in output if part]
 
 
 def _agrupar_segmentos_audio(
@@ -197,30 +386,72 @@ def _agrupar_segmentos_audio(
     return agrupados
 
 
+def _form_profile_blocks(text: str) -> list[str]:
+    """Divide formulários por estudante/campo sem regras para consultas específicas.
+
+    A ficha de um aluno pode exceder os 128 tokens reais do MiniLM.
+    Uma linha '- Campo: valor' vira unidade recuperável, sempre com o
+    identificador do aluno. Os demais documentos seguem o fluxo normal.
+    """
+    blocks: list[str] = []
+    for profile, section in _profile_sections(text):
+        if not profile:
+            # Preserve a introdução do documento sem misturá-la a um aluno.
+            blocks.extend(dividir_texto(section))
+            continue
+        lines = [line.strip() for line in section.splitlines() if line.strip()]
+        fields = [line for line in lines if line.startswith(("- ", "* "))]
+        others = [
+            line
+            for line in lines
+            if not line.startswith(("- ", "* ")) and line != profile
+        ]
+        if fields:
+            blocks.extend(f"{profile}\n{field}" for field in fields)
+            blocks.extend(f"{profile}\n{line}" for line in others)
+        else:
+            blocks.extend(dividir_texto(section))
+    return blocks
+
+
 def dividir_segmentos(
     segmentos: list[tuple[str, str]],
     *,
     task_type: str,
-    tamanho: int = 500,
-    sobreposicao: int = 50,
+    tamanho: int = DEFAULT_STRUCTURAL_CHARS,
+    sobreposicao: int = 160,
+    source: str = "documento",
+    tokenizer: Any | None = None,
 ) -> list[ChunkRecord]:
-    """Fatia segmentos preservando `page_or_time`, `chunk_index` e `content_hash`."""
+    """Retain page/time provenance and build contextual payload for citation."""
     if task_type == "audio":
         segmentos = _agrupar_segmentos_audio(segmentos, tamanho)
 
     registros: list[ChunkRecord] = []
-    chunk_index = 0
     for localizador, texto in segmentos:
-        for bloco in dividir_texto(texto, tamanho=tamanho, sobreposicao=sobreposicao):
-            registros.append(
-                ChunkRecord(
-                    text=bloco,
-                    page_or_time=localizador,
-                    chunk_index=chunk_index,
-                    content_hash=compute_sha256(bloco),
-                )
+        # Campos de formulário são unidades semânticas: nunca misturar
+        # estudantes e nunca separar nome do campo do seu valor.
+        if _PROFILE_START.search(texto):
+            blocos = _form_profile_blocks(texto)
+        else:
+            blocos = dividir_texto(texto, tamanho=tamanho, sobreposicao=sobreposicao)
+        for bloco in blocos:
+            header = _context_header(source, localizador, bloco)
+            parts = (
+                _fit_token_budget(bloco, header, tokenizer)
+                if tokenizer is not None
+                else [bloco]
             )
-            chunk_index += 1
+            for part in parts:
+                contextual = f"{header}\n{part}"
+                registros.append(
+                    ChunkRecord(
+                        text=contextual,
+                        page_or_time=localizador,
+                        chunk_index=len(registros),
+                        content_hash=compute_sha256(contextual),
+                    )
+                )
     return registros
 
 
@@ -374,8 +605,8 @@ def ingest_files(
     corpus_scope: str = CORPUS_SCOPE_INSTITUTIONAL,
     target_collection_scope: str = CORPUS_SCOPE_INSTITUTIONAL,
     recreate: bool = False,
-    chunk_size: int = 500,
-    chunk_overlap: int = 50,
+    chunk_size: int = DEFAULT_STRUCTURAL_CHARS,
+    chunk_overlap: int = 160,
     qdrant_url: str | None = None,
     client: QdrantClient | None = None,
     embedder: Embedder | None = None,
@@ -476,12 +707,24 @@ def ingest_files(
                     continue
                 hashes_lote.add(file_hash)
 
+                if modelo is None:
+                    from sentence_transformers import SentenceTransformer
+
+                    modelo = SentenceTransformer(MODELO_NOME)
+                tokenizer = getattr(modelo, "tokenizer", None)
+                if tokenizer is None:
+                    # A test embedder can expose only encode(); production
+                    # SentenceTransformer must supply the actual tokenizer.
+                    if embedder is None:
+                        raise RuntimeError("Tokenizador MiniLM indisponível.")
                 task_type = identificar_tipo(arquivo)
                 chunks = dividir_segmentos(
                     segmentos_sanitizados,
                     task_type=task_type,
                     tamanho=chunk_size,
                     sobreposicao=chunk_overlap,
+                    source=arquivo.name,
+                    tokenizer=tokenizer,
                 )
                 if not chunks:
                     summary.failed_files += 1
@@ -511,11 +754,6 @@ def ingest_files(
                 ):
                     summary.skipped_unchanged += 1
                     continue
-
-                if modelo is None:
-                    from sentence_transformers import SentenceTransformer
-
-                    modelo = SentenceTransformer(MODELO_NOME)
 
                 vetores = gerar_embeddings([c.text for c in chunks], modelo)
                 now_iso = datetime.now(UTC).isoformat()
