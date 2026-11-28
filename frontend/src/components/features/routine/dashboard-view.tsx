@@ -252,6 +252,12 @@ function AuthenticatedRoutine({
     setReloadTick((n) => n + 1);
   }, []);
 
+  // Recarrega a agenda quando uma proposta é confirmada pelo chat lateral.
+  useEffect(() => {
+    window.addEventListener("vezo:schedule-updated", triggerReload);
+    return () => window.removeEventListener("vezo:schedule-updated", triggerReload);
+  }, [triggerReload]);
+
   const goalsById = useMemo(
     () => Object.fromEntries(goals.map((g) => [g.goal_id, g])),
     [goals],
